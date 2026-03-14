@@ -19,7 +19,7 @@ const NAV = [
       { href: "/games/unity", label: "Unity Game", icon: Gamepad2 },
       { href: "/games/grudge-wars", label: "Grudge Wars", icon: Swords },
       { href: "/games/angeler", label: "Grudge Angeler", icon: Fish },
-      { href: "/games/gdevelop", label: "GDevelop", icon: Joystick },
+      { href: "/games/gdevelop", label: "App Manager", icon: Joystick },
       { href: "/games/tools", label: "Builder & Tools", icon: Wrench },
     ],
   },
