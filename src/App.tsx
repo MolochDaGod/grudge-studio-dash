@@ -20,6 +20,7 @@ import UnityServers from "./pages/UnityServers";
 import Deploy from "./pages/Deploy";
 import SchemaEditor from "./pages/SchemaEditor";
 import Query from "./pages/Query";
+import Economy from "./pages/Economy";
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/database" component={DatabasePage} />
           <Route path="/schema" component={SchemaEditor} />
           <Route path="/query" component={Query} />
+          <Route path="/economy" component={Economy} />
           <Route path="/logs" component={Logs} />
           <Route>
             <div className="text-center py-20">

@@ -2,7 +2,7 @@ import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Users, Gamepad2, Swords, Fish, Joystick, Wrench,
   Server, HardDrive, Database, ScrollText, Rocket,
-  Trophy, Layers, Monitor, TableProperties, Code, Search,
+  Trophy, Layers, Monitor, TableProperties, Code, Search, Coins,
 } from "lucide-react";
 
 const NAV = [
@@ -45,6 +45,12 @@ const NAV = [
       { href: "/database", label: "Tables", icon: Database },
       { href: "/schema", label: "Schema Editor", icon: TableProperties },
       { href: "/query", label: "Query", icon: Search },
+    ],
+  },
+  {
+    section: "Economy",
+    items: [
+      { href: "/economy", label: "GBUX Economy", icon: Coins },
     ],
   },
   {
