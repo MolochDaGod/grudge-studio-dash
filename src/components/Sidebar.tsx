@@ -69,10 +69,10 @@ export default function Sidebar() {
     <aside className="fantasy-panel fixed left-0 top-0 bottom-0 w-56 flex flex-col z-50 overflow-y-auto">
       {/* Logo */}
       <div className="p-4 border-b border-border">
-        <Link href="/" className="block">
+        <a href="https://grudge-studio.com" className="block" target="_self" rel="noopener noreferrer">
           <h2 className="text-lg gold-text font-bold tracking-wider">Grudge Studio</h2>
           <p className="text-[0.65rem] text-muted-foreground uppercase tracking-widest mt-0.5">Dashboard</p>
-        </Link>
+        </a>
       </div>
 
       {/* Nav sections */}
