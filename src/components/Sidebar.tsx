@@ -2,14 +2,16 @@ import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Users, Gamepad2, Swords, Fish, Joystick, Wrench,
   Server, HardDrive, Database, ScrollText, Rocket,
-  Trophy, Layers, Monitor, TableProperties, Code, Search, Coins,
+  Trophy, Layers, Monitor, TableProperties, Search, Coins,
+  Settings2, BookOpen, LogOut,
 } from "lucide-react";
+import { useAuth } from "../lib/auth-context";
 
 const NAV = [
   {
-    section: "Studio",
+    section: "Overview",
     items: [
-      { href: "/", label: "Overview", icon: LayoutDashboard },
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/accounts", label: "Accounts", icon: Users },
     ],
   },
@@ -24,46 +26,44 @@ const NAV = [
     ],
   },
   {
-    section: "Lobbies & Arena",
+    section: "PvP & Lobbies",
     items: [
       { href: "/lobbies", label: "Lobby Manager", icon: Layers },
       { href: "/arena", label: "Arena", icon: Trophy },
+      { href: "/mode-configs", label: "Game Modes", icon: Settings2 },
+      { href: "/unity-servers", label: "Headless Servers", icon: Monitor },
       { href: "/tcg", label: "TCG", icon: Layers },
-      { href: "/unity-servers", label: "Unity Servers", icon: Monitor },
     ],
   },
   {
-    section: "Server & Deploy",
-    items: [
-      { href: "/services", label: "Services", icon: Server },
-      { href: "/deploy", label: "Deploy", icon: Rocket },
-    ],
-  },
-  {
-    section: "Database",
+    section: "Data",
     items: [
       { href: "/database", label: "Tables", icon: Database },
       { href: "/schema", label: "Schema Editor", icon: TableProperties },
       { href: "/query", label: "Query", icon: Search },
-    ],
-  },
-  {
-    section: "Economy",
-    items: [
-      { href: "/economy", label: "GBUX Economy", icon: Coins },
+      { href: "/economy", label: "Economy", icon: Coins },
     ],
   },
   {
     section: "Infrastructure",
     items: [
+      { href: "/services", label: "Services", icon: Server },
+      { href: "/deploy", label: "Deploy", icon: Rocket },
       { href: "/storage", label: "Object Storage", icon: HardDrive },
       { href: "/logs", label: "Logs", icon: ScrollText },
+    ],
+  },
+  {
+    section: "Reference",
+    items: [
+      { href: "/docs", label: "Docs & Maps", icon: BookOpen },
     ],
   },
 ];
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <aside className="fantasy-panel fixed left-0 top-0 bottom-0 w-56 flex flex-col z-50 overflow-y-auto">
@@ -104,8 +104,14 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-border text-[0.6rem] text-muted-foreground text-center">
-        dash.grudge-studio.com
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[0.6rem] text-muted-foreground">{user?.username || "Admin"}</span>
+          <button onClick={logout} className="p-1 rounded hover:bg-accent" title="Logout">
+            <LogOut size={12} className="text-muted-foreground hover:text-danger" />
+          </button>
+        </div>
+        <div className="text-[0.55rem] text-muted-foreground text-center">dash.grudge-studio.com</div>
       </div>
     </aside>
   );

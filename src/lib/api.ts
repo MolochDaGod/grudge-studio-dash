@@ -1,13 +1,42 @@
 import { API, SERVICES, type ServiceKey } from "./config";
 
-// ── Generic fetcher ─────────────────────────────────────────────
+// ── Auth token accessor ─────────────────────────────────────────
+function getToken(): string | null {
+  try {
+    const raw = sessionStorage.getItem("grudge_dash_session");
+    if (!raw) return null;
+    return JSON.parse(raw)?.token || null;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
+}
+
+// ── Generic fetcher with auth ───────────────────────────────────
 async function fetcher<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { ...authHeaders(), ...init?.headers },
   });
+
+  if (res.status === 401) {
+    sessionStorage.removeItem("grudge_dash_session");
+    window.location.reload();
+    throw new Error("Session expired");
+  }
+  if (res.status === 403) throw new Error("Access denied — admin role required");
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
+}
+
+async function safeFetcher<T>(url: string, init?: RequestInit): Promise<T | null> {
+  try { return await fetcher<T>(url, init); } catch { return null; }
 }
 
 // ── Health checks ───────────────────────────────────────────────
@@ -17,6 +46,7 @@ export interface HealthResult {
   url: string;
   ok: boolean;
   ms: number;
+  version?: string;
   error?: string;
 }
 
@@ -24,8 +54,10 @@ export async function checkHealth(key: ServiceKey): Promise<HealthResult> {
   const svc = SERVICES.find((s) => s.key === key)!;
   const start = performance.now();
   try {
-    await fetch(`${svc.url}/health`, { method: "GET", mode: "cors", signal: AbortSignal.timeout(8000) });
-    return { key, name: svc.name, url: svc.url, ok: true, ms: Math.round(performance.now() - start) };
+    const r = await fetch(`${svc.url}/health`, { method: "GET", signal: AbortSignal.timeout(8000) });
+    let body: any = {};
+    try { body = await r.json(); } catch {}
+    return { key, name: svc.name, url: svc.url, ok: r.ok, ms: Math.round(performance.now() - start), version: body?.version };
   } catch (e) {
     return { key, name: svc.name, url: svc.url, ok: false, ms: Math.round(performance.now() - start), error: String(e) };
   }
@@ -35,12 +67,8 @@ export async function checkAllHealth(): Promise<HealthResult[]> {
   return Promise.all(SERVICES.map((s) => checkHealth(s.key)));
 }
 
-// ── Deployment status (HEAD check) ─────────────────────────────
-export interface DeployStatus {
-  url: string;
-  online: boolean;
-  ms: number;
-}
+// ── Deployment status ───────────────────────────────────────────
+export interface DeployStatus { url: string; online: boolean; ms: number; }
 
 export async function checkDeployment(url: string): Promise<DeployStatus> {
   if (!url) return { url, online: false, ms: 0 };
@@ -53,83 +81,113 @@ export async function checkDeployment(url: string): Promise<DeployStatus> {
   }
 }
 
-// ── Game API ────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════
+// GAME API — api.grudge-studio.com (no /api/ prefix)
+// ═════════════════════════════════════════════════════════════════
+
 export const gameApi = {
-  characters: () => fetcher<any[]>(`${API.api}/api/characters`),
-  items: () => fetcher<any[]>(`${API.api}/api/items`),
-  crafting: () => fetcher<any[]>(`${API.api}/api/crafting`),
-  islands: () => fetcher<any[]>(`${API.api}/api/islands`),
-  skills: () => fetcher<any[]>(`${API.api}/api/skills`),
-  gameData: () => fetcher<any>(`${API.api}/api/game-data`),
+  characters: () => fetcher<any[]>(`${API.api}/characters`),
+  character: (id: number) => fetcher<any>(`${API.api}/characters/${id}`),
+  islands: () => fetcher<any[]>(`${API.api}/islands`),
+  missions: () => fetcher<any[]>(`${API.api}/missions`),
+  crews: () => fetcher<any[]>(`${API.api}/crews`),
+  craftingRecipes: () => fetcher<any[]>(`${API.api}/crafting/recipes`),
 };
 
-// ── Account API ─────────────────────────────────────────────────
+export const pvpApi = {
+  lobbies: (status?: string) => fetcher<any[]>(`${API.api}/pvp/lobbies${status ? `?status=${status}` : ""}`),
+  lobby: (code: string) => fetcher<any>(`${API.api}/pvp/lobby/${code}`),
+  leaderboard: (mode = "duel", limit = 50) => fetcher<any>(`${API.api}/pvp/leaderboard?mode=${mode}&limit=${limit}`),
+  ratings: (grudgeId?: string) => fetcher<any>(`${API.api}/pvp/ratings${grudgeId ? `?grudge_id=${grudgeId}` : ""}`),
+  modeConfigs: () => fetcher<{ modes: Record<string, any> }>(`${API.api}/pvp/mode-configs`),
+  servers: () => fetcher<{ servers: any[] }>(`${API.api}/pvp/servers`),
+};
+
+export const economyApi = {
+  balance: (charId: number) => fetcher<any>(`${API.api}/economy/balance?char_id=${charId}`),
+  summary: () => safeFetcher<any>(`${API.api}/economy/balance?summary=true`),
+};
+
+// ── Account API — account.grudge-studio.com ─────────────────────
 export const accountApi = {
-  list: () => fetcher<any[]>(`${API.account}/api/accounts`),
-  linked: () => fetcher<any[]>(`${API.account}/api/accounts/linked`),
-  auditLog: () => fetcher<any[]>(`${API.account}/api/accounts/audit-log`),
-  sessions: () => fetcher<any[]>(`${API.account}/api/accounts/sessions`),
+  profile: (grudgeId: string) => fetcher<any>(`${API.account}/profile/${grudgeId}`),
+  friends: () => fetcher<any[]>(`${API.account}/friends`),
+  notifications: () => fetcher<any[]>(`${API.account}/notifications`),
+  achievements: () => fetcher<any>(`${API.account}/achievements/mine`),
+  sessions: () => fetcher<any[]>(`${API.account}/sessions`),
 };
 
-// ── Auth API ────────────────────────────────────────────────────
 export const authApi = {
-  sessions: () => fetcher<any[]>(`${API.auth}/api/auth/sessions`),
-  providers: () => fetcher<any[]>(`${API.auth}/api/auth/providers`),
+  verify: () => fetcher<any>(`${API.auth}/auth/verify`),
+  user: () => fetcher<any>(`${API.auth}/auth/user`),
 };
 
-// ── MinIO / Storage ─────────────────────────────────────────────
-export const storageApi = {
-  buckets: () => fetcher<any[]>(`${API.api}/api/storage/buckets`),
-  objects: (bucket: string) => fetcher<any[]>(`${API.api}/api/storage/objects/${bucket}`),
+// ═════════════════════════════════════════════════════════════════
+// ADMIN API — api.grudge-studio.com/admin/*
+// ═════════════════════════════════════════════════════════════════
+
+export const adminApi = {
+  dbTables: () => fetcher<any[]>(`${API.api}/admin/db/tables`),
+  dbTableData: (table: string, limit = 50) => fetcher<any[]>(`${API.api}/admin/db/tables/${table}?limit=${limit}`),
+  dbSchema: (table: string) => fetcher<any[]>(`${API.api}/admin/db/schema/${table}`),
+  dbQuery: (sql: string) => fetcher<any>(`${API.api}/admin/db/query`, { method: "POST", body: JSON.stringify({ sql }) }),
+  stats: () => safeFetcher<any>(`${API.api}/admin/stats`),
+  containers: () => safeFetcher<any[]>(`${API.api}/admin/containers`),
+  containerRestart: (id: string) => fetcher<any>(`${API.api}/admin/containers/${id}/restart`, { method: "POST" }),
+  containerLogs: (id: string, lines = 100) => fetcher<any>(`${API.api}/admin/containers/${id}/logs?lines=${lines}`),
+  storageBuckets: () => safeFetcher<any>(`${API.api}/admin/storage/buckets`),
+  pvpServers: () => safeFetcher<{ servers: any[] }>(`${API.api}/admin/pvp/servers`),
 };
 
-// ── Database stats (via game API proxy) ─────────────────────────
-export const dbApi = {
-  tables: () => fetcher<any[]>(`${API.api}/api/db/tables`),
-  stats: () => fetcher<any>(`${API.api}/api/db/stats`),
-  tableData: (table: string, limit = 50) => fetcher<any[]>(`${API.api}/api/db/tables/${table}?limit=${limit}`),
-  schema: (table: string) => fetcher<any[]>(`${API.api}/api/db/schema/${table}`),
-  query: (sql: string) => fetcher<any>(`${API.api}/api/db/query`, { method: "POST", body: JSON.stringify({ sql }) }),
-  migrate: (sql: string) => fetcher<any>(`${API.api}/api/db/migrate`, { method: "POST", body: JSON.stringify({ sql }) }),
-};
-
-// ── Lobby & Arena Management ────────────────────────────────────
-export type LobbyType = "pvp_arena" | "tcg" | "unity_server" | "custom";
+// ── Lobby types ─────────────────────────────────────────────────
+export type LobbyType = "duel" | "crew_battle" | "arena_ffa" | "nemesis" | "rpg_fighter" | "thc_battle";
 
 export interface Lobby {
-  id: string;
-  name: string;
-  type: LobbyType;
-  status: "waiting" | "active" | "paused" | "ended";
-  maxPlayers: number;
-  currentPlayers: number;
-  config: Record<string, any>;
-  createdAt: string;
+  lobby_code: string;
+  mode: LobbyType;
+  island: string;
+  host_grudge_id: string;
+  host_username?: string;
+  status: "waiting" | "ready" | "in_progress" | "finished" | "cancelled";
+  max_players: number;
+  player_count: number;
+  created_at: string;
 }
 
 export const lobbyApi = {
-  list: () => fetcher<Lobby[]>(`${API.api}/api/lobbies`),
-  get: (id: string) => fetcher<Lobby>(`${API.api}/api/lobbies/${id}`),
-  create: (data: Partial<Lobby>) => fetcher<Lobby>(`${API.api}/api/lobbies`, { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Lobby>) => fetcher<Lobby>(`${API.api}/api/lobbies/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  delete: (id: string) => fetcher<void>(`${API.api}/api/lobbies/${id}`, { method: "DELETE" }),
-  start: (id: string) => fetcher<Lobby>(`${API.api}/api/lobbies/${id}/start`, { method: "POST" }),
-  stop: (id: string) => fetcher<Lobby>(`${API.api}/api/lobbies/${id}/stop`, { method: "POST" }),
+  list: () => fetcher<Lobby[]>(`${API.api}/pvp/lobbies?limit=50`),
+  get: (code: string) => fetcher<Lobby>(`${API.api}/pvp/lobby/${code}`),
+  create: (data: { mode: string; island?: string; char_id: number; max_players?: number }) =>
+    fetcher<any>(`${API.api}/pvp/lobby`, { method: "POST", body: JSON.stringify(data) }),
+  leave: (code: string) => fetcher<any>(`${API.api}/pvp/lobby/${code}/leave`, { method: "DELETE" }),
+  start: (code: string) => fetcher<any>(`${API.api}/pvp/lobby/${code}/start`, { method: "POST" }),
 };
 
 export const arenaApi = {
-  matches: () => fetcher<any[]>(`${API.api}/api/arena/matches`),
-  leaderboard: () => fetcher<any[]>(`${API.api}/api/arena/leaderboard`),
-  queue: () => fetcher<any[]>(`${API.api}/api/arena/queue`),
-  createRound: (config: any) => fetcher<any>(`${API.api}/api/arena/rounds`, { method: "POST", body: JSON.stringify(config) }),
-  kick: (playerId: string) => fetcher<void>(`${API.api}/api/arena/kick/${playerId}`, { method: "POST" }),
+  matches: () => pvpApi.lobbies("in_progress"),
+  leaderboard: (mode = "duel") => pvpApi.leaderboard(mode),
+  queue: () => safeFetcher<any[]>(`${API.api}/pvp/queue`),
 };
 
-// ── Deploy / Server Management ──────────────────────────────────
+// ── Backward compat aliases ─────────────────────────────────────
 export const deployApi = {
-  containers: () => fetcher<any[]>(`${API.api}/api/deploy/containers`),
-  restart: (service: string) => fetcher<any>(`${API.api}/api/deploy/restart/${service}`, { method: "POST" }),
-  rebuild: (service: string) => fetcher<any>(`${API.api}/api/deploy/rebuild/${service}`, { method: "POST" }),
-  logs: (service: string, lines?: number) => fetcher<any>(`${API.api}/api/deploy/logs/${service}?lines=${lines ?? 100}`),
-  history: () => fetcher<any[]>(`${API.api}/api/deploy/history`),
+  containers: () => adminApi.containers(),
+  restart: (id: string) => adminApi.containerRestart(id),
+  rebuild: (id: string) => adminApi.containerRestart(id),
+  logs: (id: string, lines?: number) => adminApi.containerLogs(id, lines),
+  history: () => safeFetcher<any[]>(`${API.api}/admin/deploy/history`),
+};
+
+export const dbApi = {
+  tables: () => adminApi.dbTables(),
+  stats: () => adminApi.stats(),
+  tableData: (table: string, limit?: number) => adminApi.dbTableData(table, limit),
+  schema: (table: string) => adminApi.dbSchema(table),
+  query: (sql: string) => adminApi.dbQuery(sql),
+  migrate: (_sql: string) => Promise.reject(new Error("Schema migrations disabled in dashboard")),
+};
+
+export const storageApi = {
+  buckets: () => adminApi.storageBuckets(),
+  objects: (bucket: string) => safeFetcher<any[]>(`${API.api}/admin/storage/objects/${bucket}`),
 };

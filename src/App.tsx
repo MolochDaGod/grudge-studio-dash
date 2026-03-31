@@ -21,6 +21,8 @@ import Deploy from "./pages/Deploy";
 import SchemaEditor from "./pages/SchemaEditor";
 import Query from "./pages/Query";
 import Economy from "./pages/Economy";
+import ModeConfigs from "./pages/ModeConfigs";
+import Docs from "./pages/Docs";
 
 export default function App() {
   return (
@@ -47,6 +49,8 @@ export default function App() {
           <Route path="/query" component={Query} />
           <Route path="/economy" component={Economy} />
           <Route path="/logs" component={Logs} />
+          <Route path="/mode-configs" component={ModeConfigs} />
+          <Route path="/docs" component={Docs} />
           <Route>
             <div className="text-center py-20">
               <h1 className="text-3xl">404</h1>
