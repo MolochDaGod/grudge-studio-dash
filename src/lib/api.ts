@@ -104,22 +104,25 @@ export const pvpApi = {
 };
 
 export const economyApi = {
-  balance: (charId: number) => fetcher<any>(`${API.api}/economy/balance?char_id=${charId}`),
-  summary: () => safeFetcher<any>(`${API.api}/economy/balance?summary=true`),
+  balance: (charId: number) => fetcher<any>(`${API.api}/admin/economy/balance?char_id=${charId}`),
+  summary: () => safeFetcher<any>(`${API.api}/admin/economy/summary`),
+  overview: () => safeFetcher<any>(`${API.api}/admin/economy/overview`),
 };
 
-// ── Account API — account.grudge-studio.com ─────────────────────
+// ── Account API — routed through game-api /admin/account/* proxy ─
 export const accountApi = {
-  profile: (grudgeId: string) => fetcher<any>(`${API.account}/profile/${grudgeId}`),
-  friends: () => fetcher<any[]>(`${API.account}/friends`),
-  notifications: () => fetcher<any[]>(`${API.account}/notifications`),
-  achievements: () => fetcher<any>(`${API.account}/achievements/mine`),
-  sessions: () => fetcher<any[]>(`${API.account}/sessions`),
+  list: () => fetcher<any[]>(`${API.api}/admin/accounts`),
+  profile: (grudgeId: string) => fetcher<any>(`${API.api}/admin/accounts/${grudgeId}`),
+  sessions: () => fetcher<any[]>(`${API.api}/admin/accounts/sessions`),
+  auditLog: () => fetcher<any[]>(`${API.api}/admin/accounts/audit-log`),
+  friends: () => safeFetcher<any[]>(`${API.api}/admin/accounts/friends`),
+  notifications: () => safeFetcher<any[]>(`${API.api}/admin/accounts/notifications`),
+  achievements: () => safeFetcher<any>(`${API.api}/admin/accounts/achievements`),
 };
 
 export const authApi = {
-  verify: () => fetcher<any>(`${API.auth}/auth/verify`),
-  user: () => fetcher<any>(`${API.auth}/auth/user`),
+  verify: () => fetcher<any>(`${API.api}/admin/auth/verify`),
+  user: () => fetcher<any>(`${API.api}/admin/auth/user`),
 };
 
 // ═════════════════════════════════════════════════════════════════

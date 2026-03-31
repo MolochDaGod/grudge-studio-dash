@@ -2,12 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import TopBar from "../components/TopBar";
 import { StatCard } from "../components/Cards";
 import { storageApi } from "../lib/api";
-import { API } from "../lib/config";
 
 const KNOWN_BUCKETS = [
-  { name: "grudge-studio-assets", access: "public", desc: "Game textures, models, UI assets" },
-  { name: "grudge-game-data", access: "private", desc: "Game configuration, save data, level data" },
-  { name: "grudge-avatars", access: "public", desc: "User profile images and avatars" },
+  { name: "grudge-assets", access: "public", desc: "Game textures, models, UI — served via assets.grudge-studio.com (R2 CDN)" },
 ];
 
 export default function Storage() {
@@ -18,7 +15,7 @@ export default function Storage() {
       <TopBar title="Object Storage" />
 
       <p className="text-sm text-muted-foreground mb-6">
-        MinIO object storage at <span className="text-primary">{API.minio}</span> — 3 buckets configured.
+        Cloudflare R2 storage at <span className="text-primary">assets.grudge-studio.com</span> — managed via asset-service.
       </p>
 
       <div className="grid grid-cols-3 gap-4 mb-6">
