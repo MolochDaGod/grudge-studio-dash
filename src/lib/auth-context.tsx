@@ -58,16 +58,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const saved = loadSession();
     if (saved) {
-      // Verify token is still valid
+      // Verify token is still valid — must be POST with { token } in body
       fetch(`${ID_BASE}/auth/verify`, {
-        headers: { Authorization: `Bearer ${saved.token}` },
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${saved.token}` },
+        body:    JSON.stringify({ token: saved.token }),
       })
-        .then((r) => {
-          if (r.ok) {
-            setUser(saved);
-          } else {
-            clearSession();
-          }
+        .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+        .then((data) => {
+          if (data?.valid !== false) setUser(saved);
+          else clearSession();
         })
         .catch(() => clearSession())
         .finally(() => setLoading(false));
@@ -91,10 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || "Login failed");
       }
 
-      // Verify admin role
-      const role = data.role || "player";
-      if (role !== "admin" && role !== "owner") {
-        throw new Error("Access denied — admin role required");
+      // Verify admin role — allowed: admin, master (owner is legacy alias)
+      const role = data.role || 'player';
+      if (!['admin', 'master', 'owner'].includes(role)) {
+        throw new Error('Access denied — admin or master role required');
       }
 
       const adminUser: AdminUser = {

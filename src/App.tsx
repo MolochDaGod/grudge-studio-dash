@@ -1,5 +1,7 @@
 import { Route, Switch } from "wouter";
 import Sidebar from "./components/Sidebar";
+import { AuthProvider, AuthGate } from "./lib/auth-context";
+import Login from "./pages/Login";
 
 // Pages
 import Overview from "./pages/Overview";
@@ -26,6 +28,8 @@ import Docs from "./pages/Docs";
 
 export default function App() {
   return (
+    <AuthProvider>
+      <AuthGate fallback={<Login />}>
     <div className="min-h-screen">
       <Sidebar />
       <main className="ml-56 p-6">
@@ -60,5 +64,7 @@ export default function App() {
         </Switch>
       </main>
     </div>
+      </AuthGate>
+    </AuthProvider>
   );
 }
