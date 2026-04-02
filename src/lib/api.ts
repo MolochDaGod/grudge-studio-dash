@@ -140,10 +140,13 @@ export const adminApi = {
   containerLogs: (id: string, lines = 100) => fetcher<any>(`${API.api}/admin/containers/${id}/logs?lines=${lines}`),
   storageBuckets: () => safeFetcher<any>(`${API.api}/admin/storage/buckets`),
   pvpServers: () => safeFetcher<{ servers: any[] }>(`${API.api}/admin/pvp/servers`),
+  pvpLobbies: (status?: string) => safeFetcher<Lobby[]>(`${API.api}/admin/pvp/lobbies${status ? `?status=${status}` : ""}`),
+  cancelLobby: (code: string) => fetcher<any>(`${API.api}/admin/pvp/lobbies/${code}/cancel`, { method: "POST" }),
 };
 
-// ── Lobby types ─────────────────────────────────────────────────
+// ── Lobby types ────────────────────────────────────
 export type LobbyType = "duel" | "crew_battle" | "arena_ffa" | "nemesis" | "rpg_fighter" | "thc_battle";
+export type LobbyStatus = "waiting" | "ready" | "in_progress" | "finished" | "cancelled";
 
 export interface Lobby {
   lobby_code: string;
@@ -151,10 +154,12 @@ export interface Lobby {
   island: string;
   host_grudge_id: string;
   host_username?: string;
-  status: "waiting" | "ready" | "in_progress" | "finished" | "cancelled";
+  status: LobbyStatus;
   max_players: number;
   player_count: number;
   created_at: string;
+  started_at?: string;
+  finished_at?: string;
 }
 
 export const lobbyApi = {

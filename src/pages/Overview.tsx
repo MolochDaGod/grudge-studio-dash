@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import TopBar from "../components/TopBar";
 import { ServiceCard, StatCard, ProjectCard } from "../components/Cards";
-import { checkAllHealth, checkDeployment } from "../lib/api";
+import { checkAllHealth, checkDeployment, adminApi } from "../lib/api";
 import { GRUDGE_APPS, SERVICES } from "../lib/config";
 import { Users, Swords, Package, Activity } from "lucide-react";
 
@@ -14,9 +14,12 @@ export default function Overview() {
     refetchInterval: 60_000,
   });
 
+  const stats = useQuery({ queryKey: ["admin-stats"], queryFn: adminApi.stats, refetchInterval: 60_000 });
+
   const onlineServices = health.data?.filter((s) => s.ok).length ?? 0;
   const totalServices = SERVICES.length;
   const onlineApps = deploys.data?.filter((d) => d.online).length ?? 0;
+  const totalAccounts = stats.data?.total_accounts ?? "—";
 
   return (
     <div>
@@ -26,7 +29,7 @@ export default function Overview() {
         <StatCard icon={<Activity size={24} className="text-success" />} value={`${onlineServices}/${totalServices}`} label="Services Online" />
         <StatCard icon={<Package size={24} className="text-primary" />} value={GRUDGE_APPS.length} label="Total Apps" />
         <StatCard icon={<Swords size={24} className="text-warning" />} value={`${onlineApps} live`} label="Apps Online" />
-        <StatCard icon={<Users size={24} className="text-gold-light" />} value="—" label="Total Accounts" />
+        <StatCard icon={<Users size={24} className="text-gold-light" />} value={totalAccounts} label="Total Accounts" />
       </div>
 
       <section className="mb-6">
