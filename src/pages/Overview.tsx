@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import TopBar from "../components/TopBar";
 import { ServiceCard, StatCard, ProjectCard } from "../components/Cards";
-import { checkAllHealth, checkDeployment, adminApi } from "../lib/api";
+import { checkAllHealth, checkDeployment, adminApi, accountApi } from "../lib/api";
 import { GRUDGE_APPS, SERVICES } from "../lib/config";
 import { Users, Swords, Package, Activity } from "lucide-react";
 
@@ -14,22 +14,38 @@ export default function Overview() {
     refetchInterval: 60_000,
   });
 
-  const stats = useQuery({ queryKey: ["admin-stats"], queryFn: adminApi.stats, refetchInterval: 60_000 });
+  // Game stats: characters, gold, matches (from game-api)
+  const gameStats = useQuery({ queryKey: ["game-stats"], queryFn: adminApi.gameStats, refetchInterval: 60_000 });
+  // Identity stats: role breakdown, active players (from grudge-id)
+  const idStats = useQuery({ queryKey: ["id-stats"], queryFn: accountApi.identityStats, refetchInterval: 60_000 });
+
+  const g = gameStats.data;
+  const id = idStats.data;
 
   const onlineServices = health.data?.filter((s) => s.ok).length ?? 0;
-  const totalServices = SERVICES.length;
-  const onlineApps = deploys.data?.filter((d) => d.online).length ?? 0;
-  const totalAccounts = stats.data?.total_accounts ?? "—";
+  const totalServices  = SERVICES.length;
+  const onlineApps     = deploys.data?.filter((d) => d.online).length ?? 0;
+  const totalAccounts  = id?.total ?? g?.total_accounts ?? "—";
+  const active24h      = id?.active_24h ?? "—";
 
   return (
     <div>
       <TopBar title="Studio Overview" />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {/* Top row: infra health */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <StatCard icon={<Activity size={24} className="text-success" />} value={`${onlineServices}/${totalServices}`} label="Services Online" />
         <StatCard icon={<Package size={24} className="text-primary" />} value={GRUDGE_APPS.length} label="Total Apps" />
         <StatCard icon={<Swords size={24} className="text-warning" />} value={`${onlineApps} live`} label="Apps Online" />
         <StatCard icon={<Users size={24} className="text-gold-light" />} value={totalAccounts} label="Total Accounts" />
+      </div>
+
+      {/* Second row: player activity + game economy */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon="🔋" value={active24h} label="Active (24h)" />
+        <StatCard icon="🛡️" value={id?.members ?? "—"} label="Members" />
+        <StatCard icon="⚿" value={g?.total_characters ?? "—"} label="Characters" />
+        <StatCard icon="💰" value={g?.gold_circulating?.toLocaleString() ?? "—"} label="Gold Circulating" />
       </div>
 
       <section className="mb-6">
