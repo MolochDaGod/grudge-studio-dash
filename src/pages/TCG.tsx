@@ -4,7 +4,7 @@ import { StatCard, DataTable } from "../components/Cards";
 import { lobbyApi } from "../lib/api";
 
 export default function TCG() {
-  const lobbies = useQuery({ queryKey: ["lobbies"], queryFn: lobbyApi.list });
+  const lobbies = useQuery<any[]>({ queryKey: ["lobbies"], queryFn: () => lobbyApi.list() });
 
   const tcgLobbies = lobbies.data?.filter((l: any) => l.type === "tcg") ?? [];
   const active = tcgLobbies.filter((l: any) => l.status === "active").length;

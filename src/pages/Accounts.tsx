@@ -4,9 +4,9 @@ import { DataTable } from "../components/Cards";
 import { accountApi } from "../lib/api";
 
 export default function Accounts() {
-  const accounts = useQuery({ queryKey: ["accounts"], queryFn: accountApi.list });
-  const sessions = useQuery({ queryKey: ["sessions"], queryFn: accountApi.sessions });
-  const auditLog = useQuery({ queryKey: ["audit-log"], queryFn: accountApi.auditLog });
+  const accounts = useQuery({ queryKey: ["accounts"], queryFn: () => accountApi.list().then(r => r?.users ?? []) });
+  const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => accountApi.sessions() });
+  const auditLog = useQuery({ queryKey: ["audit-log"], queryFn: () => accountApi.auditLog() });
 
   return (
     <div>

@@ -8,7 +8,7 @@ import { useState } from "react";
 export default function Deploy() {
   const qc = useQueryClient();
   const containers = useQuery({ queryKey: ["containers"], queryFn: deployApi.containers, refetchInterval: 15_000 });
-  const history = useQuery({ queryKey: ["deploy-history"], queryFn: deployApi.history });
+  const history = useQuery({ queryKey: ["deploy-history"], queryFn: () => deployApi.history() });
   const [logsId, setLogsId] = useState<string | null>(null);
   const logs = useQuery({ queryKey: ["deploy-logs", logsId], queryFn: () => deployApi.logs(logsId!), enabled: !!logsId });
 

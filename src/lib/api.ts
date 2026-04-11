@@ -92,6 +92,10 @@ export const gameApi = {
   missions:       () => fetcher<any[]>(`${API.api}/missions`),
   crews:          () => fetcher<any[]>(`${API.api}/crews`),
   craftingRecipes:() => fetcher<any[]>(`${API.api}/crafting/recipes`),
+  // Aliases used by game pages
+  items:          () => fetcher<any[]>(`${API.api}/items`),
+  crafting:       () => fetcher<any[]>(`${API.api}/crafting`),
+  skills:         () => fetcher<any[]>(`${API.api}/skills`),
 };
 
 // PvP — status param now works on backend (default: 'waiting')
@@ -155,7 +159,7 @@ export const adminApi = {
   dbQuery:        (sql: string) => fetcher<any>(`${API.api}/admin/db/query`, { method: "POST", body: JSON.stringify({ sql }) }),
   // game stats: characters, matches, lobbies, gold, redis keys
   gameStats:      () => safeFetcher<any>(`${API.api}/admin/stats`),
-  containers:
+  containers:      () => safeFetcher<any[]>(`${API.api}/admin/containers`),
   containerRestart:(id: string) => fetcher<any>(`${API.api}/admin/containers/${id}/restart`, { method: "POST" }),
   containerLogs:  (id: string, lines = 100) => fetcher<any>(`${API.api}/admin/containers/${id}/logs?lines=${lines}`),
   storageBuckets: () => safeFetcher<any>(`${API.api}/admin/storage/buckets`),
@@ -172,8 +176,14 @@ export const adminApi = {
 export const deployApi = {
   containers:() => adminApi.containers(),
   restart:   (id: string) => adminApi.containerRestart(id),
+  rebuild:   (id: string) => adminApi.containerRestart(id), // same endpoint until rebuild endpoint is added
   logs:      (id: string, lines?: number) => adminApi.containerLogs(id, lines),
   history:   (service?: string) => adminApi.deployHistory(service),
+};
+
+// lobbyApi — simple wrapper used by TCG and UnityServers pages
+export const lobbyApi = {
+  list: (status?: string) => pvpApi.lobbies(status ?? "all"),
 };
 
 export const dbApi = {
@@ -182,6 +192,7 @@ export const dbApi = {
   schema:   (table: string) => adminApi.dbSchema(table),
   query:    (sql: string) => adminApi.dbQuery(sql),
   migrate:  (_sql: string) => Promise.reject(new Error("Schema migrations disabled in dashboard")),
+  stats:    () => safeFetcher<{ totalRows: number; dbSize: string; redisKeys: number }>(`${API.api}/admin/db/stats`),
 };
 
 export const storageApi = {

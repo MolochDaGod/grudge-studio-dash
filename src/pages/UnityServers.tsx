@@ -7,7 +7,7 @@ import { RefreshCw } from "lucide-react";
 export default function UnityServers() {
   const qc = useQueryClient();
   const containers = useQuery({ queryKey: ["containers"], queryFn: deployApi.containers });
-  const lobbies = useQuery({ queryKey: ["lobbies"], queryFn: lobbyApi.list });
+  const lobbies = useQuery<any[]>({ queryKey: ["lobbies"], queryFn: () => lobbyApi.list() });
 
   const unityContainers = containers.data?.filter((c: any) => c.name?.includes("unity") || c.image?.includes("unity")) ?? [];
   const unityLobbies = lobbies.data?.filter((l: any) => l.type === "unity") ?? [];
