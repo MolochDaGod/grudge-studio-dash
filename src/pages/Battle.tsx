@@ -3,26 +3,27 @@ import { useQuery } from "@tanstack/react-query";
 import TopBar from "../components/TopBar";
 import { gameApi } from "../lib/api";
 import {
-  BattleEngine,
+  BattleEngine3D,
   type BattleChar,
   type BattleLogEntry,
   type SpellType,
-  CLASS_ICONS,
-  CLASS_COLORS,
   SPELL_COLORS,
 } from "../lib/battle/engine";
 
-const CANVAS_W = 1120;
-const CANVAS_H = 760;
-
 const SPELLS: { id: SpellType; label: string; icon: string; mp: number; desc: string }[] = [
-  { id: "fireball", label: "Fireball", icon: "🔥", mp: 10, desc: "Launches a fiery projectile — applies Burn" },
-  { id: "ice_lance", label: "Ice Lance", icon: "❄️", mp: 10, desc: "A shard of ice — applies Freeze" },
-  { id: "lightning", label: "Lightning", icon: "⚡", mp: 10, desc: "A bolt of lightning — applies Shock" },
-  { id: "shadow_bolt", label: "Shadow Bolt", icon: "🌑", mp: 10, desc: "Dark energy bolt — applies Poison" },
-  { id: "earth_spike", label: "Earth Spike", icon: "🪨", mp: 10, desc: "A spike of stone erupts from below" },
-  { id: "heal", label: "Heal", icon: "💚", mp: 15, desc: "Restores HP to an ally — applies Regen" },
+  { id: "fireball", label: "Fireball", icon: "🔥", mp: 10, desc: "Fiery projectile" },
+  { id: "ice_lance", label: "Ice Lance", icon: "❄️", mp: 10, desc: "Shard of ice" },
+  { id: "lightning", label: "Lightning", icon: "⚡", mp: 10, desc: "Lightning bolt" },
+  { id: "shadow_bolt", label: "Shadow Bolt", icon: "🌑", mp: 10, desc: "Dark energy" },
+  { id: "heal", label: "Heal", icon: "💚", mp: 15, desc: "Restores HP" },
 ];
+
+const RACE_ICONS: Record<string, string> = {
+  human: "🧑", barbarian: "🪓", dwarf: "⛏️", elf: "🧝", orc: "👹", undead: "💀",
+};
+const CLASS_ICONS: Record<string, string> = {
+  warrior: "⚔️", mage: "🔮", ranger: "🏹", worg: "🐺",
+};
 
 const LOG_COLORS: Record<BattleLogEntry["type"], string> = {
   action: "text-primary",
@@ -34,15 +35,16 @@ const LOG_COLORS: Record<BattleLogEntry["type"], string> = {
 
 export default function Battle() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<BattleEngine | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<BattleEngine3D | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   const [selectedChar, setSelectedChar] = useState<BattleChar | null>(null);
   const [battleLog, setBattleLog] = useState<BattleLogEntry[]>([]);
   const [activeSpell, setActiveSpell] = useState<SpellType | null>(null);
-  const [, setTick] = useState(0); // force re-renders
+  const [loadMsg, setLoadMsg] = useState<string | null>("Initializing...");
+  const [, setTick] = useState(0);
 
-  // Fetch characters from API (falls back to demo if unavailable)
   const charsQuery = useQuery({
     queryKey: ["battle-characters"],
     queryFn: () => gameApi.characters(),
@@ -50,15 +52,16 @@ export default function Battle() {
     staleTime: 60_000,
   });
 
-  // Initialize engine
+  // Initialize 3D engine
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
-    canvas.width = CANVAS_W;
-    canvas.height = CANVAS_H;
+    const w = container.clientWidth;
+    const h = Math.min(w * 0.65, 700);
 
-    const engine = new BattleEngine(canvas);
+    const engine = new BattleEngine3D(canvas, w, h);
     engineRef.current = engine;
 
     engine.onLogUpdate = (log) => {
@@ -67,55 +70,43 @@ export default function Battle() {
     };
     engine.onSelectionChange = (ch) => setSelectedChar(ch ? { ...ch } : null);
     engine.onStateChange = () => setTick((t) => t + 1);
+    engine.onLoadProgress = (msg) => setLoadMsg(msg);
 
-    engine.initDefaultBattle(charsQuery.data ?? undefined);
     engine.start();
+    engine.initBattle(charsQuery.data ?? undefined);
 
-    return () => engine.destroy();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const onResize = () => {
+      const nw = container.clientWidth;
+      const nh = Math.min(nw * 0.65, 700);
+      engine.resize(nw, nh);
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      engine.destroy();
+    };
   }, [charsQuery.data]);
 
-  // Handle spell target click
-  const handleCanvasClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const engine = engineRef.current;
-      if (!engine || !activeSpell || !selectedChar) return;
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      const scaleX = CANVAS_W / rect.width;
-      const scaleY = CANVAS_H / rect.height;
-      const mx = (e.clientX - rect.left) * scaleX;
-      const my = (e.clientY - rect.top) * scaleY;
-
-      // Find target character
-      for (const ch of engine.chars) {
-        if (ch.state === "dead") continue;
-        const dx = ch.pos.x - mx;
-        const dy = ch.pos.y - my;
-        if (Math.sqrt(dx * dx + dy * dy) < 36) {
-          engine.castSpell(selectedChar.id, activeSpell, ch.id);
-          setActiveSpell(null);
-          return;
-        }
-      }
-    },
-    [activeSpell, selectedChar]
-  );
+  // Spell targeting: click a character in the sidebar to cast on them
+  const handleSpellTarget = useCallback((targetId: number) => {
+    const engine = engineRef.current;
+    if (!engine || !activeSpell || !selectedChar) return;
+    engine.castSpell(selectedChar.id, activeSpell, targetId);
+    setActiveSpell(null);
+  }, [activeSpell, selectedChar]);
 
   const handleAttack = useCallback(() => {
     const engine = engineRef.current;
     if (!engine || !selectedChar) return;
-    // Auto-attack first alive enemy
     const enemies = engine.getEnemyChars().filter((c) => c.state !== "dead");
-    if (enemies.length > 0) {
-      engine.autoAttackTarget(selectedChar.id, enemies[0].id);
-    }
+    if (enemies.length > 0) engine.autoAttack(selectedChar.id, enemies[0].id);
   }, [selectedChar]);
 
   const handleReset = useCallback(() => {
     const engine = engineRef.current;
     if (!engine) return;
-    engine.initDefaultBattle(charsQuery.data ?? undefined);
+    engine.initBattle(charsQuery.data ?? undefined);
     setBattleLog([]);
     setSelectedChar(null);
     setActiveSpell(null);
@@ -138,15 +129,23 @@ export default function Battle() {
       </p>
 
       <div className="flex gap-4">
-        {/* ── Main battle canvas ───────────────────────────── */}
-        <div className="flex-1 min-w-0">
-          <div className="fantasy-panel p-2 battle-canvas-container">
+        {/* ── Main 3D battle canvas ─────────────────────────── */}
+        <div className="flex-1 min-w-0" ref={containerRef}>
+          <div className="fantasy-panel p-2 battle-canvas-container relative">
             <canvas
               ref={canvasRef}
-              className={`w-full rounded cursor-crosshair ${activeSpell ? "battle-targeting" : ""}`}
-              style={{ imageRendering: "auto", aspectRatio: `${CANVAS_W}/${CANVAS_H}` }}
-              onClick={handleCanvasClick}
+              className={`w-full rounded ${activeSpell ? "battle-targeting cursor-crosshair" : "cursor-pointer"}`}
             />
+            {loadMsg && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded z-10">
+                <div className="text-center">
+                  <div className="text-primary text-sm font-bold mb-2 animate-pulse">{loadMsg}</div>
+                  <div className="w-32 h-1 bg-muted rounded overflow-hidden mx-auto">
+                    <div className="h-full bg-primary animate-[shimmer_1.5s_infinite]" style={{ width: "60%" }} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Action bar ──────────────────────────────────── */}
@@ -155,7 +154,7 @@ export default function Battle() {
               <span className="text-xs text-primary font-bold uppercase tracking-wider">Actions</span>
               {selectedChar && (
                 <span className="text-xs text-muted-foreground">
-                  — {selectedChar.name} ({selectedChar.charClass})
+                  — {selectedChar.name} ({selectedChar.classId})
                   <span className="ml-2 text-blue-400">{selectedChar.mp}/{selectedChar.maxMp} MP</span>
                 </span>
               )}
@@ -186,11 +185,6 @@ export default function Battle() {
                       }
                       disabled:opacity-40 disabled:cursor-not-allowed`}
                     title={spell.desc}
-                    style={
-                      isActive
-                        ? { boxShadow: `0 0 12px ${SPELL_COLORS[spell.id].glow}40` }
-                        : undefined
-                    }
                   >
                     {spell.icon} {spell.label}
                     <span className="ml-1 text-[10px] text-blue-400">{spell.mp}mp</span>
@@ -216,7 +210,8 @@ export default function Battle() {
                 key={ch.id}
                 char={ch}
                 isSelected={ch.id === selectedChar?.id}
-                onClick={() => engine?.selectChar(ch.id)}
+                onClick={() => activeSpell ? handleSpellTarget(ch.id) : engine?.selectChar(ch.id)}
+                targeting={!!activeSpell}
               />
             ))}
           </div>
@@ -229,7 +224,8 @@ export default function Battle() {
                 key={ch.id}
                 char={ch}
                 isSelected={ch.id === selectedChar?.id}
-                onClick={() => engine?.selectChar(ch.id)}
+                onClick={() => activeSpell ? handleSpellTarget(ch.id) : engine?.selectChar(ch.id)}
+                targeting={!!activeSpell}
               />
             ))}
           </div>
@@ -269,10 +265,12 @@ function CharCard({
   char: ch,
   isSelected,
   onClick,
+  targeting = false,
 }: {
   char: BattleChar;
   isSelected: boolean;
   onClick: () => void;
+  targeting?: boolean;
 }) {
   const hpPct = Math.round((ch.hp / ch.maxHp) * 100);
   const mpPct = Math.round((ch.mp / ch.maxMp) * 100);
@@ -282,27 +280,27 @@ function CharCard({
     <button
       onClick={onClick}
       className={`w-full text-left px-2 py-1.5 rounded mb-1 transition-all text-xs border
-        ${isDead ? "opacity-40 border-border" : isSelected ? "border-primary bg-primary/10" : "border-transparent hover:bg-accent/30"}
+        ${isDead ? "opacity-40 border-border" : isSelected ? "border-primary bg-primary/10" : targeting ? "border-warning/50 hover:bg-warning/10" : "border-transparent hover:bg-accent/30"}
       `}
     >
       <div className="flex items-center gap-2">
-        <span className="text-sm">{isDead ? "💀" : CLASS_ICONS[ch.charClass]}</span>
+        <span className="text-sm">{isDead ? "💀" : (RACE_ICONS[ch.raceId] ?? "🧑")}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <span className={`font-bold truncate ${isDead ? "line-through text-muted-foreground" : "text-foreground"}`}>
               {ch.name}
             </span>
-            <span className="text-[10px] text-muted-foreground ml-1">Lv.{ch.level}</span>
+            <span className="text-[10px] text-muted-foreground ml-1">
+              {CLASS_ICONS[ch.classId] ?? ""} Lv.{ch.level}
+            </span>
           </div>
+          <div className="text-[9px] text-muted-foreground mb-0.5">{ch.raceId} {ch.classId}</div>
           {/* HP bar */}
-          <div className="flex items-center gap-1 mt-0.5">
+          <div className="flex items-center gap-1">
             <div className="flex-1 h-1.5 bg-black/40 rounded-sm overflow-hidden">
               <div
                 className="h-full rounded-sm transition-all"
-                style={{
-                  width: `${hpPct}%`,
-                  background: hpPct > 60 ? "#2ecc71" : hpPct > 30 ? "#f39c12" : "#e74c3c",
-                }}
+                style={{ width: `${hpPct}%`, background: hpPct > 60 ? "#2ecc71" : hpPct > 30 ? "#f39c12" : "#e74c3c" }}
               />
             </div>
             <span className="text-[9px] text-muted-foreground w-14 text-right">{ch.hp}/{ch.maxHp}</span>
@@ -310,44 +308,18 @@ function CharCard({
           {/* MP bar */}
           <div className="flex items-center gap-1 mt-0.5">
             <div className="flex-1 h-1 bg-black/40 rounded-sm overflow-hidden">
-              <div
-                className="h-full rounded-sm bg-blue-500 transition-all"
-                style={{ width: `${mpPct}%` }}
-              />
+              <div className="h-full rounded-sm bg-blue-500 transition-all" style={{ width: `${mpPct}%` }} />
             </div>
             <span className="text-[9px] text-blue-400 w-14 text-right">{ch.mp}/{ch.maxMp}</span>
           </div>
-          {/* Status */}
-          {ch.statusEffects.length > 0 && (
-            <div className="flex gap-1 mt-0.5">
-              {ch.statusEffects.map((s, i) => (
-                <span
-                  key={i}
-                  className="inline-block px-1 py-0 text-[8px] rounded border"
-                  style={{
-                    borderColor: statusColor(s.type),
-                    color: statusColor(s.type),
-                  }}
-                >
-                  {s.type}
-                </span>
-              ))}
-            </div>
-          )}
-          {/* State */}
           {ch.state !== "idle" && ch.state !== "dead" && (
             <span className="text-[9px] text-warning">{ch.state}</span>
+          )}
+          {targeting && !isDead && (
+            <span className="text-[9px] text-warning">🎯 Click to target</span>
           )}
         </div>
       </div>
     </button>
   );
-}
-
-function statusColor(type: string): string {
-  const map: Record<string, string> = {
-    burn: "#ff6348", freeze: "#74b9ff", shock: "#feca57",
-    regen: "#55efc4", shield: "#a29bfe", poison: "#6ab04c",
-  };
-  return map[type] ?? "#888";
 }

@@ -1,71 +1,49 @@
 // ════════════════════════════════════════════════════════════════
-// Grudge Battle Engine — Canvas-based 2D RPG battle renderer
-// Character rendering, walk/run movement, spell casting VFX
+// Grudge 3D Battle Engine — Three.js scene with GLB race models
+// Grid arena, walk/run movement, spell casting VFX
 // ════════════════════════════════════════════════════════════════
 
-// ── Types ───────────────────────────────────────────────────────
-export type CharClass = "warrior" | "mage" | "rogue" | "healer" | "ranger";
-export type Team = "player" | "enemy";
-export type SpellType = "fireball" | "ice_lance" | "lightning" | "heal" | "shadow_bolt" | "earth_spike";
-export type CharState = "idle" | "walking" | "running" | "casting" | "attacking" | "hit" | "dead";
+import * as THREE from "three";
+import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-export interface Vec2 { x: number; y: number; }
+// ── Asset CDN ───────────────────────────────────────────────────
+const CDN = "https://assets.grudge-studio.com";
+
+// ── Types ───────────────────────────────────────────────────────
+export type RaceId = "human" | "barbarian" | "dwarf" | "elf" | "orc" | "undead";
+export type ClassId = "warrior" | "mage" | "ranger" | "worg";
+export type Team = "player" | "enemy";
+export type CharState = "idle" | "walking" | "running" | "casting" | "attacking" | "hit" | "dead";
+export type SpellType = "fireball" | "ice_lance" | "lightning" | "heal" | "shadow_bolt";
 
 export interface BattleChar {
   id: number;
   name: string;
-  charClass: CharClass;
+  raceId: RaceId;
+  classId: ClassId;
   team: Team;
   level: number;
   hp: number;
   maxHp: number;
   mp: number;
   maxMp: number;
-  pos: Vec2;          // current rendered position (world px)
-  gridPos: Vec2;      // grid cell
-  targetPos: Vec2 | null;
+  gridX: number;
+  gridZ: number;
   state: CharState;
-  moveSpeed: number;  // pixels per second
-  facing: number;     // radians
-  animFrame: number;
-  animTimer: number;
-  statusEffects: StatusEffect[];
+  model: THREE.Group | null;
+  mixer: THREE.AnimationMixer | null;
+  actions: Map<string, THREE.AnimationAction>;
+  targetWorldPos: THREE.Vector3 | null;
+  moveSpeed: number;
   castTimer: number;
   castDuration: number;
   castSpell: SpellType | null;
-  castTarget: Vec2 | null;
-  hitFlashTimer: number;
-}
-
-export interface StatusEffect {
-  type: "burn" | "freeze" | "shock" | "regen" | "shield" | "poison";
-  duration: number;  // seconds remaining
-  strength: number;
-}
-
-export interface Particle {
-  x: number; y: number;
-  vx: number; vy: number;
-  life: number; maxLife: number;
-  size: number;
-  color: string;
-  alpha: number;
-  gravity: number;
-  decay: number;
-  glow: number;
-  type: "circle" | "spark" | "ring" | "trail";
-}
-
-export interface SpellProjectile {
-  spell: SpellType;
-  from: Vec2;
-  to: Vec2;
-  pos: Vec2;
-  speed: number;
-  progress: number;
-  particles: Particle[];
-  alive: boolean;
-  onImpact: (() => void) | null;
+  castTargetId: number | null;
+  hitFlash: number;
+  nameSprite: THREE.Sprite | null;
+  hpBarGroup: THREE.Group | null;
 }
 
 export interface BattleLogEntry {
@@ -74,889 +52,560 @@ export interface BattleLogEntry {
   type: "action" | "damage" | "heal" | "status" | "system";
 }
 
-export interface ScreenShake {
-  intensity: number;
-  duration: number;
-  elapsed: number;
+interface VFXParticle {
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+}
+
+interface SpellProjectile {
+  spell: SpellType;
+  mesh: THREE.Mesh;
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  progress: number;
+  speed: number;
+  alive: boolean;
+  onImpact: (() => void) | null;
 }
 
 // ── Constants ───────────────────────────────────────────────────
 const GRID_COLS = 10;
 const GRID_ROWS = 6;
-const TILE_W = 96;
-const TILE_H = 96;
-const GRID_OFFSET_X = 80;
-const GRID_OFFSET_Y = 80;
-const CHAR_RADIUS = 28;
-const HP_BAR_W = 56;
-const HP_BAR_H = 6;
-const MP_BAR_H = 4;
-const ANIM_FPS = 8;
-const RUN_THRESHOLD = 3; // grid distance to trigger running vs walking
+const TILE_SIZE = 4;
+const GRID_ORIGIN_X = -(GRID_COLS * TILE_SIZE) / 2;
+const GRID_ORIGIN_Z = -(GRID_ROWS * TILE_SIZE) / 2;
 
-const CLASS_COLORS: Record<CharClass, string> = {
-  warrior: "#e74c3c",
-  mage: "#9b59b6",
-  rogue: "#2ecc71",
-  healer: "#f1c40f",
-  ranger: "#e67e22",
+const RACE_MODELS: Record<RaceId, { path: string; scale: number }> = {
+  human:     { path: "/models/characters/human.glb",     scale: 1.0 },
+  barbarian: { path: "/models/characters/barbarian.glb", scale: 1.1 },
+  dwarf:     { path: "/models/characters/dwarf.glb",     scale: 0.85 },
+  elf:       { path: "/models/characters/elf.glb",       scale: 1.0 },
+  orc:       { path: "/models/characters/orc.glb",       scale: 1.15 },
+  undead:    { path: "/models/characters/undead.glb",     scale: 1.0 },
 };
 
-const CLASS_ICONS: Record<CharClass, string> = {
-  warrior: "⚔️",
-  mage: "🔮",
-  rogue: "🗡️",
-  healer: "✨",
-  ranger: "🏹",
+const SPELL_COLORS: Record<SpellType, number> = {
+  fireball:    0xff6b35,
+  ice_lance:   0x74b9ff,
+  lightning:   0xfdcb6e,
+  heal:        0x55efc4,
+  shadow_bolt: 0x6c5ce7,
 };
 
-const SPELL_COLORS: Record<SpellType, { primary: string; secondary: string; glow: string }> = {
-  fireball:     { primary: "#ff6b35", secondary: "#ffcc02", glow: "#ff4500" },
-  ice_lance:    { primary: "#74b9ff", secondary: "#dfe6e9", glow: "#0984e3" },
-  lightning:    { primary: "#fdcb6e", secondary: "#ffeaa7", glow: "#f9ca24" },
-  heal:         { primary: "#55efc4", secondary: "#00b894", glow: "#00cec9" },
-  shadow_bolt:  { primary: "#6c5ce7", secondary: "#a29bfe", glow: "#5f27cd" },
-  earth_spike:  { primary: "#b2bec3", secondary: "#636e72", glow: "#d63031" },
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  burn: "#ff6348",
-  freeze: "#74b9ff",
-  shock: "#feca57",
-  regen: "#55efc4",
-  shield: "#a29bfe",
-  poison: "#6ab04c",
-};
-
-// ── Utilities ───────────────────────────────────────────────────
-function gridToWorld(gx: number, gy: number): Vec2 {
-  return {
-    x: GRID_OFFSET_X + gx * TILE_W + TILE_W / 2,
-    y: GRID_OFFSET_Y + gy * TILE_H + TILE_H / 2,
-  };
+// ── Helpers ─────────────────────────────────────────────────────
+function gridToWorld(gx: number, gz: number): THREE.Vector3 {
+  return new THREE.Vector3(
+    GRID_ORIGIN_X + gx * TILE_SIZE + TILE_SIZE / 2,
+    0,
+    GRID_ORIGIN_Z + gz * TILE_SIZE + TILE_SIZE / 2,
+  );
 }
 
-function worldToGrid(wx: number, wy: number): Vec2 {
-  return {
-    x: Math.floor((wx - GRID_OFFSET_X) / TILE_W),
-    y: Math.floor((wy - GRID_OFFSET_Y) / TILE_H),
-  };
+function gridDist(a: { x: number; z: number }, b: { x: number; z: number }): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
 }
 
-function dist(a: Vec2, b: Vec2): number {
-  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
-}
+// ── BattleEngine3D ──────────────────────────────────────────────
+export class BattleEngine3D {
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls;
+  clock: THREE.Clock;
 
-function gridDist(a: Vec2, b: Vec2): number {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
-
-function randomRange(lo: number, hi: number): number {
-  return lo + Math.random() * (hi - lo);
-}
-
-function easeOutCubic(t: number): number {
-  return 1 - (1 - t) ** 3;
-}
-
-function easeInOutQuad(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-}
-
-// ── Particle Factory ────────────────────────────────────────────
-function spawnParticles(spell: SpellType, x: number, y: number, count: number): Particle[] {
-  const c = SPELL_COLORS[spell];
-  const particles: Particle[] = [];
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = randomRange(20, 120);
-    const isPrimary = Math.random() > 0.4;
-    particles.push({
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: randomRange(0.3, 1.2),
-      maxLife: randomRange(0.3, 1.2),
-      size: randomRange(2, 8),
-      color: isPrimary ? c.primary : c.secondary,
-      alpha: 1,
-      gravity: spell === "earth_spike" ? 120 : (spell === "heal" ? -60 : 0),
-      decay: 1,
-      glow: randomRange(4, 16),
-      type: Math.random() > 0.6 ? "spark" : "circle",
-    });
-  }
-  return particles;
-}
-
-function spawnTrailParticle(spell: SpellType, x: number, y: number): Particle {
-  const c = SPELL_COLORS[spell];
-  return {
-    x: x + randomRange(-4, 4),
-    y: y + randomRange(-4, 4),
-    vx: randomRange(-15, 15),
-    vy: randomRange(-15, 15),
-    life: 0.4,
-    maxLife: 0.4,
-    size: randomRange(2, 5),
-    color: Math.random() > 0.5 ? c.primary : c.secondary,
-    alpha: 0.8,
-    gravity: spell === "heal" ? -40 : 0,
-    decay: 1,
-    glow: 8,
-    type: "trail",
-  };
-}
-
-function spawnImpactParticles(spell: SpellType, x: number, y: number): Particle[] {
-  const c = SPELL_COLORS[spell];
-  const particles: Particle[] = [];
-  const count = spell === "lightning" ? 30 : 40;
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = randomRange(40, 200);
-    particles.push({
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - (spell === "earth_spike" ? 100 : 0),
-      life: randomRange(0.4, 1.5),
-      maxLife: randomRange(0.4, 1.5),
-      size: randomRange(3, 12),
-      color: Math.random() > 0.3 ? c.primary : c.glow,
-      alpha: 1,
-      gravity: spell === "earth_spike" ? 200 : (spell === "heal" ? -80 : 30),
-      decay: 1,
-      glow: randomRange(8, 24),
-      type: Math.random() > 0.5 ? "spark" : (Math.random() > 0.5 ? "ring" : "circle"),
-    });
-  }
-  return particles;
-}
-
-// ── BattleEngine ────────────────────────────────────────────────
-export class BattleEngine {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
   chars: BattleChar[] = [];
-  particles: Particle[] = [];
+  particles: VFXParticle[] = [];
   projectiles: SpellProjectile[] = [];
   log: BattleLogEntry[] = [];
-  selectedCharId: number | null = null;
-  hoveredCell: Vec2 | null = null;
-  screenShake: ScreenShake | null = null;
-  running = false;
-  lastTime = 0;
-  turnIndex = 0;
-  onLogUpdate: ((log: BattleLogEntry[]) => void) | null = null;
-  onSelectionChange: ((char: BattleChar | null) => void) | null = null;
-  onStateChange: (() => void) | null = null;
-  ambientParticleTimer = 0;
-  gridPulse = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d")!;
-    this.canvas.addEventListener("click", this.handleClick);
-    this.canvas.addEventListener("mousemove", this.handleMouseMove);
+  selectedCharId: number | null = null;
+  running = false;
+  animFrameId: number | null = null;
+
+  private gltfLoader: GLTFLoader;
+  private modelCache = new Map<string, GLTF>();
+  private gridGroup: THREE.Group;
+  private gridHighlight: THREE.Mesh | null = null;
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+
+  onLogUpdate: ((log: BattleLogEntry[]) => void) | null = null;
+  onSelectionChange: ((ch: BattleChar | null) => void) | null = null;
+  onStateChange: (() => void) | null = null;
+  onLoadProgress: ((msg: string | null) => void) | null = null;
+
+  constructor(canvas: HTMLCanvasElement, width: number, height: number) {
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.3;
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x1a1a2e);
+    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.012);
+
+    this.camera = new THREE.PerspectiveCamera(50, width / height, 0.5, 500);
+    this.camera.position.set(0, 35, 30);
+
+    this.controls = new OrbitControls(this.camera, canvas);
+    this.controls.target.set(0, 0, -4);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.08;
+    this.controls.maxPolarAngle = Math.PI * 0.45;
+    this.controls.minDistance = 15;
+    this.controls.maxDistance = 80;
+    this.controls.update();
+
+    this.clock = new THREE.Clock();
+
+    this.gltfLoader = new GLTFLoader();
+    const draco = new DRACOLoader();
+    draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+    this.gltfLoader.setDRACOLoader(draco);
+
+    this.gridGroup = new THREE.Group();
+    this.scene.add(this.gridGroup);
+
+    this.setupLighting();
+    this.buildGrid();
+
+    canvas.addEventListener("click", (e) => this.handleClick(e, canvas));
+    canvas.addEventListener("mousemove", (e) => this.handleMouseMove(e, canvas));
   }
 
-  // ── Initialization ──────────────────────────────────────────
-  initDefaultBattle(apiChars?: any[]) {
-    this.chars = [];
-    if (apiChars && apiChars.length > 0) {
-      // Map API characters to battle characters
-      const playerChars = apiChars.slice(0, Math.min(apiChars.length, 4));
-      playerChars.forEach((c, i) => {
-        const gx = 1;
-        const gy = 1 + i;
-        const wp = gridToWorld(gx, gy);
-        this.chars.push({
-          id: c.id ?? i + 1,
-          name: c.name ?? `Hero ${i + 1}`,
-          charClass: this.mapApiClass(c.class ?? c.character_class ?? "warrior"),
-          team: "player",
-          level: c.level ?? 1,
-          hp: c.hp ?? c.health ?? 100,
-          maxHp: c.max_hp ?? c.health ?? 100,
-          mp: c.mp ?? c.mana ?? 50,
-          maxMp: c.max_mp ?? c.mana ?? 50,
-          pos: { ...wp },
-          gridPos: { x: gx, y: gy },
-          targetPos: null,
-          state: "idle",
-          moveSpeed: 200,
-          facing: 0,
-          animFrame: 0,
-          animTimer: 0,
-          statusEffects: [],
-          castTimer: 0,
-          castDuration: 0,
-          castSpell: null,
-          castTarget: null,
-          hitFlashTimer: 0,
-        });
-      });
-    } else {
-      // Default demo characters
-      const playerDefs: [string, CharClass, number, number][] = [
-        ["Kael", "warrior", 1, 1],
-        ["Lyra", "mage", 1, 2],
-        ["Shade", "rogue", 1, 3],
-        ["Sera", "healer", 1, 4],
-      ];
-      playerDefs.forEach(([name, cls, gx, gy], i) => {
-        const wp = gridToWorld(gx, gy);
-        this.chars.push({
-          id: i + 1, name, charClass: cls, team: "player",
-          level: randomRange(3, 12) | 0,
-          hp: 100, maxHp: 100, mp: 60, maxMp: 60,
-          pos: { ...wp }, gridPos: { x: gx, y: gy }, targetPos: null,
-          state: "idle", moveSpeed: 200, facing: 0,
-          animFrame: 0, animTimer: 0, statusEffects: [],
-          castTimer: 0, castDuration: 0, castSpell: null, castTarget: null,
-          hitFlashTimer: 0,
-        });
-      });
+  private setupLighting() {
+    this.scene.add(new THREE.HemisphereLight(0x6688cc, 0x332211, 0.5));
+
+    const sun = new THREE.DirectionalLight(0xfff4e0, 1.5);
+    sun.position.set(20, 40, 15);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera;
+    sc.left = -30; sc.right = 30; sc.top = 20; sc.bottom = -20;
+    sc.near = 1; sc.far = 100;
+    sun.shadow.bias = -0.001;
+    this.scene.add(sun);
+
+    this.scene.add(Object.assign(new THREE.DirectionalLight(0xd4af37, 0.4), { position: new THREE.Vector3(-15, 10, -20) }));
+
+    for (const [x, z] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const pl = new THREE.PointLight(0xd4af37, 0.3, 20);
+      pl.position.set(x * GRID_COLS * TILE_SIZE / 2, 3, z * GRID_ROWS * TILE_SIZE / 2);
+      this.scene.add(pl);
+    }
+  }
+
+  private buildGrid() {
+    const floorGeo = new THREE.PlaneGeometry(GRID_COLS * TILE_SIZE + 8, GRID_ROWS * TILE_SIZE + 8);
+    const floor = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({ color: 0x16213e, roughness: 0.9, metalness: 0.1 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.05;
+    floor.receiveShadow = true;
+    this.scene.add(floor);
+
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        const tileGeo = new THREE.PlaneGeometry(TILE_SIZE - 0.15, TILE_SIZE - 0.15);
+        const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({
+          color: (row + col) % 2 === 0 ? 0x1e2340 : 0x161b33,
+          roughness: 0.85, metalness: 0.05, transparent: true, opacity: 0.9,
+        }));
+        tile.rotation.x = -Math.PI / 2;
+        const wp = gridToWorld(col, row);
+        tile.position.set(wp.x, 0.01, wp.z);
+        tile.receiveShadow = true;
+        tile.userData = { type: "gridTile", col, row };
+        this.gridGroup.add(tile);
+
+        const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(tileGeo),
+          new THREE.LineBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.2 }),
+        );
+        edges.rotation.x = -Math.PI / 2;
+        edges.position.set(wp.x, 0.02, wp.z);
+        this.gridGroup.add(edges);
+      }
     }
 
-    // Enemy characters
-    const enemyDefs: [string, CharClass, number, number][] = [
-      ["Dread Knight", "warrior", 8, 1],
-      ["Dark Mage", "mage", 8, 2],
-      ["Shadow", "rogue", 8, 3],
-      ["Necro", "healer", 8, 4],
+    // Team zones
+    for (const [color, xOff] of [[0x2ecc71, GRID_ORIGIN_X + TILE_SIZE * 1.5], [0xe74c3c, -GRID_ORIGIN_X - TILE_SIZE * 1.5]] as [number, number][]) {
+      const zone = new THREE.Mesh(
+        new THREE.PlaneGeometry(TILE_SIZE * 3, TILE_SIZE * GRID_ROWS),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.04 }),
+      );
+      zone.rotation.x = -Math.PI / 2;
+      zone.position.set(xOff, 0.03, 0);
+      this.gridGroup.add(zone);
+    }
+
+    // Hover highlight
+    this.gridHighlight = new THREE.Mesh(
+      new THREE.PlaneGeometry(TILE_SIZE - 0.1, TILE_SIZE - 0.1),
+      new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0 }),
+    );
+    this.gridHighlight.rotation.x = -Math.PI / 2;
+    this.gridHighlight.position.y = 0.04;
+    this.scene.add(this.gridHighlight);
+  }
+
+  // ── Raycasting ────────────────────────────────────────────────
+  private updateMouse(e: MouseEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  private handleClick(e: MouseEvent, canvas: HTMLCanvasElement) {
+    this.updateMouse(e, canvas);
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    for (const ch of this.chars) {
+      if (!ch.model || ch.state === "dead") continue;
+      if (this.raycaster.intersectObject(ch.model, true).length > 0) {
+        this.selectedCharId = ch.id;
+        this.onSelectionChange?.(ch);
+        this.onStateChange?.();
+        return;
+      }
+    }
+
+    const tileHit = this.raycaster.intersectObjects(this.gridGroup.children, false)
+      .find(h => h.object.userData?.type === "gridTile");
+    if (tileHit && this.selectedCharId != null) {
+      this.moveCharTo(this.selectedCharId, tileHit.object.userData.col, tileHit.object.userData.row);
+    }
+  }
+
+  private handleMouseMove(e: MouseEvent, canvas: HTMLCanvasElement) {
+    this.updateMouse(e, canvas);
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const tileHit = this.raycaster.intersectObjects(this.gridGroup.children, false)
+      .find(h => h.object.userData?.type === "gridTile");
+    if (tileHit && this.gridHighlight) {
+      const wp = gridToWorld(tileHit.object.userData.col, tileHit.object.userData.row);
+      this.gridHighlight.position.set(wp.x, 0.04, wp.z);
+      (this.gridHighlight.material as THREE.MeshBasicMaterial).opacity = 0.15;
+    } else if (this.gridHighlight) {
+      (this.gridHighlight.material as THREE.MeshBasicMaterial).opacity = 0;
+    }
+  }
+
+  // ── Initialization ────────────────────────────────────────────
+  async initBattle(apiChars?: any[]) {
+    for (const ch of this.chars) {
+      if (ch.model) this.scene.remove(ch.model);
+      if (ch.nameSprite) this.scene.remove(ch.nameSprite);
+      if (ch.hpBarGroup) this.scene.remove(ch.hpBarGroup);
+    }
+    this.chars = [];
+    this.log = [];
+    this.selectedCharId = null;
+
+    const playerDefs = apiChars?.length
+      ? apiChars.slice(0, 4).map((c: any, i: number) => ({
+          name: c.name ?? `Hero ${i + 1}`,
+          raceId: (c.race_id ?? c.raceId ?? "human") as RaceId,
+          classId: (c.class_id ?? c.classId ?? "warrior") as ClassId,
+          gx: 1, gz: 1 + i,
+        }))
+      : [
+          { name: "Kael", raceId: "human" as RaceId, classId: "warrior" as ClassId, gx: 1, gz: 1 },
+          { name: "Lyra", raceId: "elf" as RaceId, classId: "mage" as ClassId, gx: 1, gz: 2 },
+          { name: "Thrak", raceId: "orc" as RaceId, classId: "worg" as ClassId, gx: 1, gz: 3 },
+          { name: "Sera", raceId: "dwarf" as RaceId, classId: "ranger" as ClassId, gx: 1, gz: 4 },
+        ];
+
+    const enemyDefs = [
+      { name: "Dread Knight", raceId: "undead" as RaceId, classId: "warrior" as ClassId, gx: 8, gz: 1 },
+      { name: "Dark Mage", raceId: "barbarian" as RaceId, classId: "mage" as ClassId, gx: 8, gz: 2 },
+      { name: "Shadow", raceId: "orc" as RaceId, classId: "ranger" as ClassId, gx: 8, gz: 3 },
+      { name: "Lich", raceId: "undead" as RaceId, classId: "mage" as ClassId, gx: 8, gz: 4 },
     ];
-    enemyDefs.forEach(([name, cls, gx, gy], i) => {
-      const wp = gridToWorld(gx, gy);
-      this.chars.push({
-        id: 100 + i, name, charClass: cls, team: "enemy",
-        level: randomRange(3, 12) | 0,
-        hp: 80 + randomRange(0, 40) | 0, maxHp: 120, mp: 50, maxMp: 50,
-        pos: { ...wp }, gridPos: { x: gx, y: gy }, targetPos: null,
-        state: "idle", moveSpeed: 180, facing: Math.PI,
-        animFrame: 0, animTimer: 0, statusEffects: [],
-        castTimer: 0, castDuration: 0, castSpell: null, castTarget: null,
-        hitFlashTimer: 0,
-      });
-    });
 
+    const allDefs = [
+      ...playerDefs.map((d, i) => ({ ...d, team: "player" as Team, id: i + 1, level: 5 + Math.floor(Math.random() * 8) })),
+      ...enemyDefs.map((d, i) => ({ ...d, team: "enemy" as Team, id: 100 + i, level: 5 + Math.floor(Math.random() * 8) })),
+    ];
+
+    this.onLoadProgress?.("Loading character models...");
+
+    for (const def of allDefs) {
+      const wp = gridToWorld(def.gx, def.gz);
+      const ch: BattleChar = {
+        id: def.id, name: def.name, raceId: def.raceId, classId: def.classId,
+        team: def.team, level: def.level,
+        hp: 100, maxHp: 100, mp: 60, maxMp: 60,
+        gridX: def.gx, gridZ: def.gz, state: "idle",
+        model: null, mixer: null, actions: new Map(),
+        targetWorldPos: null, moveSpeed: def.team === "enemy" ? 8 : 10,
+        castTimer: 0, castDuration: 0, castSpell: null, castTargetId: null,
+        hitFlash: 0, nameSprite: null, hpBarGroup: null,
+      };
+
+      try {
+        const raceCfg = RACE_MODELS[def.raceId] ?? RACE_MODELS.human;
+        this.onLoadProgress?.(`Loading ${def.name} (${def.raceId})...`);
+        const gltf = await this.loadGLTF(CDN + raceCfg.path);
+        const model = gltf.scene.clone();
+        model.scale.setScalar(raceCfg.scale * 2);
+        model.position.set(wp.x, 0, wp.z);
+        if (def.team === "enemy") model.rotation.y = Math.PI;
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) { child.castShadow = true; child.receiveShadow = true; }
+        });
+        this.scene.add(model);
+        ch.model = model;
+
+        if (gltf.animations.length > 0) {
+          ch.mixer = new THREE.AnimationMixer(model);
+          for (const clip of gltf.animations) {
+            ch.actions.set(clip.name.toLowerCase(), ch.mixer.clipAction(clip));
+          }
+          const idle = this.findAction(ch, "idle");
+          idle?.reset().play();
+        }
+      } catch {
+        const fb = this.createFallback(def.team, def.raceId);
+        fb.position.set(wp.x, 0, wp.z);
+        this.scene.add(fb);
+        ch.model = fb;
+      }
+
+      ch.nameSprite = this.createNameplate(def.name, def.team, def.level);
+      this.scene.add(ch.nameSprite);
+      ch.hpBarGroup = this.createHPBar();
+      this.scene.add(ch.hpBarGroup);
+      this.chars.push(ch);
+    }
+
+    this.onLoadProgress?.(null);
     this.addLog("Battle begins!", "system");
+    this.onStateChange?.();
   }
 
-  private mapApiClass(cls: string): CharClass {
-    const map: Record<string, CharClass> = {
-      warrior: "warrior", fighter: "warrior", knight: "warrior", paladin: "warrior",
-      mage: "mage", wizard: "mage", sorcerer: "mage",
-      rogue: "rogue", thief: "rogue", assassin: "rogue",
-      healer: "healer", cleric: "healer", priest: "healer",
-      ranger: "ranger", archer: "ranger", hunter: "ranger",
-    };
-    return map[cls.toLowerCase()] ?? "warrior";
+  private async loadGLTF(url: string): Promise<GLTF> {
+    if (this.modelCache.has(url)) return this.modelCache.get(url)!;
+    return new Promise((resolve, reject) => {
+      this.gltfLoader.load(url, (gltf) => { this.modelCache.set(url, gltf); resolve(gltf); }, undefined, reject);
+    });
   }
 
-  // ── Game loop ───────────────────────────────────────────────
-  start() {
-    if (this.running) return;
-    this.running = true;
-    this.lastTime = performance.now();
-    requestAnimationFrame(this.loop);
+  private findAction(ch: BattleChar, ...names: string[]): THREE.AnimationAction | null {
+    for (const name of names) {
+      for (const [key, action] of ch.actions) {
+        if (key.includes(name)) return action;
+      }
+    }
+    return ch.actions.values().next().value ?? null;
   }
 
-  stop() {
-    this.running = false;
+  private fadeToAction(ch: BattleChar, ...names: string[]) {
+    const next = this.findAction(ch, ...names);
+    if (!next || !ch.mixer) return;
+    ch.mixer.stopAllAction();
+    next.reset().fadeIn(0.3).play();
   }
 
-  private loop = (now: number) => {
+  private createFallback(team: Team, raceId: RaceId): THREE.Group {
+    const g = new THREE.Group();
+    const colors: Record<string, number> = { human: 0x4488ff, barbarian: 0xaa4422, dwarf: 0x886633, elf: 0x44cc88, orc: 0x448844, undead: 0x664488 };
+    const body = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.5, 1.5, 8, 16),
+      new THREE.MeshStandardMaterial({ color: team === "enemy" ? 0xcc3333 : (colors[raceId] ?? 0x4488ff), roughness: 0.6 }),
+    );
+    body.position.y = 1.5;
+    body.castShadow = true;
+    g.add(body);
+    return g;
+  }
+
+  private createNameplate(name: string, team: Team, level: number): THREE.Sprite {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 64;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.beginPath(); ctx.roundRect(4, 4, 248, 56, 8); ctx.fill();
+    ctx.strokeStyle = team === "player" ? "#d4af37" : "#e74c3c";
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(4, 4, 248, 56, 8); ctx.stroke();
+    ctx.fillStyle = team === "player" ? "#d4af37" : "#ff6b6b";
+    ctx.font = "bold 20px 'Spectral SC', serif"; ctx.textAlign = "center";
+    ctx.fillText(name, 128, 30);
+    ctx.fillStyle = "#aaa"; ctx.font = "14px sans-serif"; ctx.fillText(`Lv.${level}`, 128, 50);
+    const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false });
+    const s = new THREE.Sprite(mat);
+    s.scale.set(4, 1, 1);
+    return s;
+  }
+
+  private createHPBar(): THREE.Group {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.2), new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.8 })));
+    const hp = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.18), new THREE.MeshBasicMaterial({ color: 0x2ecc71 }));
+    hp.name = "hpFill"; g.add(hp);
+    const mp = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.12), new THREE.MeshBasicMaterial({ color: 0x3498db }));
+    mp.name = "mpFill"; mp.position.y = -0.2; g.add(mp);
+    return g;
+  }
+
+  // ── Game loop ─────────────────────────────────────────────────
+  start() { if (this.running) return; this.running = true; this.clock.start(); this.loop(); }
+  stop() { this.running = false; if (this.animFrameId) cancelAnimationFrame(this.animFrameId); }
+
+  private loop = () => {
     if (!this.running) return;
-    const dt = Math.min((now - this.lastTime) / 1000, 0.05);
-    this.lastTime = now;
+    const dt = Math.min(this.clock.getDelta(), 0.05);
     this.update(dt);
-    this.render();
-    requestAnimationFrame(this.loop);
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+    this.animFrameId = requestAnimationFrame(this.loop);
   };
 
-  // ── Update ──────────────────────────────────────────────────
   private update(dt: number) {
-    this.gridPulse += dt;
-    this.ambientParticleTimer += dt;
-
-    // Ambient particles on grid
-    if (this.ambientParticleTimer > 0.3) {
-      this.ambientParticleTimer = 0;
-      const rx = GRID_OFFSET_X + Math.random() * GRID_COLS * TILE_W;
-      const ry = GRID_OFFSET_Y + Math.random() * GRID_ROWS * TILE_H;
-      this.particles.push({
-        x: rx, y: ry, vx: randomRange(-5, 5), vy: -randomRange(10, 30),
-        life: 2, maxLife: 2, size: randomRange(1, 3),
-        color: "hsl(43,85%,55%)", alpha: 0.3, gravity: -5, decay: 1, glow: 4,
-        type: "circle",
-      });
-    }
-
-    // Update characters
     for (const ch of this.chars) {
       if (ch.state === "dead") continue;
-
-      // Hit flash
-      if (ch.hitFlashTimer > 0) ch.hitFlashTimer -= dt;
+      ch.mixer?.update(dt);
 
       // Movement
-      if (ch.targetPos && (ch.state === "walking" || ch.state === "running")) {
-        const d = dist(ch.pos, ch.targetPos);
+      if (ch.targetWorldPos && (ch.state === "walking" || ch.state === "running") && ch.model) {
+        const dir = new THREE.Vector3().subVectors(ch.targetWorldPos, ch.model.position);
+        dir.y = 0;
+        const d = dir.length();
         const speed = ch.state === "running" ? ch.moveSpeed * 1.8 : ch.moveSpeed;
-        if (d < 4) {
-          ch.pos = { ...ch.targetPos };
-          ch.targetPos = null;
+        if (d < 0.3) {
+          ch.model.position.set(ch.targetWorldPos.x, 0, ch.targetWorldPos.z);
+          ch.targetWorldPos = null;
           ch.state = "idle";
-          ch.animFrame = 0;
+          this.fadeToAction(ch, "idle");
         } else {
-          const dx = ch.targetPos.x - ch.pos.x;
-          const dy = ch.targetPos.y - ch.pos.y;
-          const len = Math.sqrt(dx * dx + dy * dy);
-          ch.pos.x += (dx / len) * speed * dt;
-          ch.pos.y += (dy / len) * speed * dt;
-          ch.facing = Math.atan2(dy, dx);
-
-          // Walk dust particles
-          if (Math.random() > 0.7) {
-            this.particles.push({
-              x: ch.pos.x + randomRange(-8, 8),
-              y: ch.pos.y + CHAR_RADIUS - 4,
-              vx: randomRange(-10, 10), vy: randomRange(-5, -20),
-              life: 0.5, maxLife: 0.5, size: randomRange(2, 4),
-              color: "#8b7355", alpha: 0.5, gravity: 0, decay: 1, glow: 0,
-              type: "circle",
-            });
-          }
-        }
-        // Animate walk/run bobbing
-        ch.animTimer += dt;
-        if (ch.animTimer > 1 / (ch.state === "running" ? ANIM_FPS * 2 : ANIM_FPS)) {
-          ch.animTimer = 0;
-          ch.animFrame = (ch.animFrame + 1) % 4;
+          dir.normalize();
+          ch.model.position.addScaledVector(dir, speed * dt);
+          ch.model.rotation.y = Math.atan2(dir.x, dir.z);
         }
       }
 
       // Casting
-      if (ch.state === "casting" && ch.castSpell) {
+      if (ch.state === "casting") {
         ch.castTimer += dt;
-        // Cast aura particles
-        if (Math.random() > 0.5) {
-          const angle = Math.random() * Math.PI * 2;
-          const r = CHAR_RADIUS + 10;
-          const c = SPELL_COLORS[ch.castSpell];
-          this.particles.push({
-            x: ch.pos.x + Math.cos(angle) * r,
-            y: ch.pos.y + Math.sin(angle) * r,
-            vx: Math.cos(angle) * -20,
-            vy: Math.sin(angle) * -20 - 15,
-            life: 0.6, maxLife: 0.6, size: randomRange(2, 5),
-            color: c.primary, alpha: 0.8, gravity: -30, decay: 1, glow: 12,
-            type: "circle",
-          });
+        if (ch.model && ch.castSpell && Math.random() > 0.5) {
+          this.spawnParticle(
+            ch.model.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 3, (Math.random() - 0.5) * 2)),
+            new THREE.Vector3((Math.random() - 0.5) * 2, 2, (Math.random() - 0.5) * 2),
+            SPELL_COLORS[ch.castSpell], 0.6,
+          );
         }
         if (ch.castTimer >= ch.castDuration) {
-          // Fire the spell
-          if (ch.castTarget) {
-            this.fireSpell(ch, ch.castSpell, ch.castTarget);
+          if (ch.castSpell && ch.castTargetId != null) this.fireProjectile(ch, ch.castSpell, ch.castTargetId);
+          ch.state = "idle"; ch.castTimer = 0; ch.castSpell = null; ch.castTargetId = null;
+          this.fadeToAction(ch, "idle");
+        }
+      }
+
+      // Hit flash
+      if (ch.hitFlash > 0) {
+        ch.hitFlash -= dt;
+        ch.model?.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
+            if (m.emissive) { m.emissive.setHex(ch.hitFlash > 0 ? 0xff4444 : 0); m.emissiveIntensity = ch.hitFlash > 0 ? 2 : 0; }
           }
-          ch.state = "idle";
-          ch.castTimer = 0;
-          ch.castSpell = null;
-          ch.castTarget = null;
-        }
-      }
-
-      // Status effect timers
-      ch.statusEffects = ch.statusEffects.filter(s => {
-        s.duration -= dt;
-        // Status particle
-        if (Math.random() > 0.85) {
-          const c = STATUS_COLORS[s.type] ?? "#fff";
-          this.particles.push({
-            x: ch.pos.x + randomRange(-12, 12),
-            y: ch.pos.y - CHAR_RADIUS + randomRange(-5, 5),
-            vx: randomRange(-8, 8), vy: -randomRange(15, 30),
-            life: 0.6, maxLife: 0.6, size: randomRange(2, 4),
-            color: c, alpha: 0.6, gravity: -10, decay: 1, glow: 6,
-            type: "circle",
-          });
-        }
-        // Regen tick
-        if (s.type === "regen" && Math.random() > 0.95) {
-          ch.hp = Math.min(ch.maxHp, ch.hp + 1);
-        }
-        // Burn tick
-        if (s.type === "burn" && Math.random() > 0.97) {
-          ch.hp = Math.max(0, ch.hp - 1);
-          if (ch.hp <= 0) ch.state = "dead";
-        }
-        return s.duration > 0;
-      });
-
-      // Idle breathing animation
-      if (ch.state === "idle") {
-        ch.animTimer += dt;
-        if (ch.animTimer > 1 / 3) {
-          ch.animTimer = 0;
-          ch.animFrame = (ch.animFrame + 1) % 2;
-        }
-      }
-    }
-
-    // Update projectiles
-    for (const proj of this.projectiles) {
-      if (!proj.alive) continue;
-      proj.progress += (proj.speed / dist(proj.from, proj.to)) * dt;
-      proj.pos.x = lerp(proj.from.x, proj.to.x, easeInOutQuad(Math.min(proj.progress, 1)));
-      proj.pos.y = lerp(proj.from.y, proj.to.y, easeInOutQuad(Math.min(proj.progress, 1)));
-
-      // Projectile trail
-      if (Math.random() > 0.3) {
-        this.particles.push(spawnTrailParticle(proj.spell, proj.pos.x, proj.pos.y));
-      }
-
-      // Lightning special: random sparks along path
-      if (proj.spell === "lightning" && Math.random() > 0.6) {
-        this.particles.push({
-          x: proj.pos.x + randomRange(-20, 20),
-          y: proj.pos.y + randomRange(-20, 20),
-          vx: randomRange(-60, 60), vy: randomRange(-60, 60),
-          life: 0.15, maxLife: 0.15, size: 2,
-          color: "#ffeaa7", alpha: 1, gravity: 0, decay: 1, glow: 16,
-          type: "spark",
         });
       }
 
-      if (proj.progress >= 1) {
-        proj.alive = false;
-        // Impact
-        this.particles.push(...spawnImpactParticles(proj.spell, proj.to.x, proj.to.y));
-        // Screen shake
-        this.screenShake = { intensity: proj.spell === "lightning" ? 8 : 5, duration: 0.3, elapsed: 0 };
-        proj.onImpact?.();
+      // UI positions
+      if (ch.model) {
+        const p = ch.model.position;
+        if (ch.nameSprite) ch.nameSprite.position.set(p.x, 4.5, p.z);
+        if (ch.hpBarGroup) {
+          ch.hpBarGroup.position.set(p.x, 3.8, p.z);
+          ch.hpBarGroup.lookAt(this.camera.position);
+          const hpFill = ch.hpBarGroup.getObjectByName("hpFill") as THREE.Mesh | undefined;
+          if (hpFill) {
+            const r = ch.hp / ch.maxHp;
+            hpFill.scale.x = Math.max(0.001, r);
+            hpFill.position.x = -(1 - r) * 1.25;
+            (hpFill.material as THREE.MeshBasicMaterial).color.setHex(r > 0.6 ? 0x2ecc71 : r > 0.3 ? 0xf39c12 : 0xe74c3c);
+          }
+          const mpFill = ch.hpBarGroup.getObjectByName("mpFill") as THREE.Mesh | undefined;
+          if (mpFill) { const r = ch.mp / ch.maxMp; mpFill.scale.x = Math.max(0.001, r); mpFill.position.x = -(1 - r) * 1.25; }
+        }
       }
-    }
-    this.projectiles = this.projectiles.filter(p => p.alive || p.progress < 1.5);
-
-    // Update particles
-    for (const p of this.particles) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vy += p.gravity * dt;
-      p.life -= dt;
-      p.alpha = clamp(p.life / p.maxLife, 0, 1);
-    }
-    this.particles = this.particles.filter(p => p.life > 0);
-
-    // Screen shake
-    if (this.screenShake) {
-      this.screenShake.elapsed += dt;
-      if (this.screenShake.elapsed >= this.screenShake.duration) {
-        this.screenShake = null;
-      }
-    }
-  }
-
-  // ── Render ──────────────────────────────────────────────────
-  private render() {
-    const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-
-    ctx.save();
-
-    // Screen shake
-    if (this.screenShake) {
-      const t = 1 - this.screenShake.elapsed / this.screenShake.duration;
-      const shakeX = (Math.random() - 0.5) * this.screenShake.intensity * t * 2;
-      const shakeY = (Math.random() - 0.5) * this.screenShake.intensity * t * 2;
-      ctx.translate(shakeX, shakeY);
-    }
-
-    // Background
-    this.renderBackground(ctx, w, h);
-
-    // Grid
-    this.renderGrid(ctx);
-
-    // Characters (sorted by y for depth)
-    const sortedChars = [...this.chars].sort((a, b) => a.pos.y - b.pos.y);
-    for (const ch of sortedChars) {
-      this.renderCharacter(ctx, ch);
     }
 
     // Projectiles
     for (const proj of this.projectiles) {
       if (!proj.alive) continue;
-      this.renderProjectile(ctx, proj);
+      proj.progress += (proj.speed / proj.from.distanceTo(proj.to)) * dt;
+      const t = Math.min(proj.progress, 1);
+      proj.mesh.position.lerpVectors(proj.from, proj.to, t);
+      proj.mesh.position.y += Math.sin(t * Math.PI) * 2;
+      if (Math.random() > 0.4) this.spawnParticle(proj.mesh.position.clone(), new THREE.Vector3((Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5) * 2), SPELL_COLORS[proj.spell], 0.3);
+      if (proj.progress >= 1) {
+        proj.alive = false;
+        this.scene.remove(proj.mesh);
+        for (let i = 0; i < 20; i++) this.spawnParticle(proj.to.clone().add(new THREE.Vector3(0, 1, 0)), new THREE.Vector3((Math.random() - 0.5) * 8, Math.random() * 6, (Math.random() - 0.5) * 8), SPELL_COLORS[proj.spell], 1.0);
+        proj.onImpact?.();
+      }
     }
+    this.projectiles = this.projectiles.filter(p => p.alive);
 
     // Particles
-    for (const p of this.particles) {
-      this.renderParticle(ctx, p);
-    }
-
-    // Hover cell highlight
-    if (this.hoveredCell) {
-      const wx = GRID_OFFSET_X + this.hoveredCell.x * TILE_W;
-      const wy = GRID_OFFSET_Y + this.hoveredCell.y * TILE_H;
-      ctx.strokeStyle = "rgba(212,175,55,0.4)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(wx, wy, TILE_W, TILE_H);
-    }
-
-    ctx.restore();
+    for (const p of this.particles) { p.mesh.position.addScaledVector(p.velocity, dt); p.velocity.y -= 3 * dt; p.life -= dt; (p.mesh.material as THREE.MeshBasicMaterial).opacity = p.life / p.maxLife; p.mesh.scale.setScalar(p.life / p.maxLife * 0.3 + 0.05); }
+    const dead = this.particles.filter(p => p.life <= 0);
+    for (const p of dead) this.scene.remove(p.mesh);
+    this.particles = this.particles.filter(p => p.life > 0);
   }
 
-  private renderBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    // Dark gradient background
-    const bg = ctx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, "hsl(225,30%,6%)");
-    bg.addColorStop(0.5, "hsl(225,28%,10%)");
-    bg.addColorStop(1, "hsl(225,30%,6%)");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, w, h);
-
-    // Subtle vignette
-    const vg = ctx.createRadialGradient(w / 2, h / 2, w * 0.2, w / 2, h / 2, w * 0.7);
-    vg.addColorStop(0, "transparent");
-    vg.addColorStop(1, "rgba(0,0,0,0.4)");
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, w, h);
+  private spawnParticle(pos: THREE.Vector3, vel: THREE.Vector3, color: number, life: number) {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshBasicMaterial({ color, transparent: true }));
+    mesh.position.copy(pos);
+    this.scene.add(mesh);
+    this.particles.push({ mesh, velocity: vel, life, maxLife: life });
   }
 
-  private renderGrid(ctx: CanvasRenderingContext2D) {
-    const pulse = Math.sin(this.gridPulse * 0.8) * 0.15 + 0.35;
-
-    for (let row = 0; row < GRID_ROWS; row++) {
-      for (let col = 0; col < GRID_COLS; col++) {
-        const x = GRID_OFFSET_X + col * TILE_W;
-        const y = GRID_OFFSET_Y + row * TILE_H;
-        const isEven = (row + col) % 2 === 0;
-
-        // Tile fill
-        ctx.fillStyle = isEven ? "rgba(30,35,50,0.6)" : "rgba(20,25,40,0.6)";
-        ctx.fillRect(x, y, TILE_W, TILE_H);
-
-        // Tile border
-        ctx.strokeStyle = `rgba(212,175,55,${pulse * 0.3})`;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 0.5, y + 0.5, TILE_W - 1, TILE_H - 1);
-
-        // Corner ornaments on some tiles
-        if ((row === 0 || row === GRID_ROWS - 1) && (col === 0 || col === GRID_COLS - 1)) {
-          ctx.fillStyle = `rgba(212,175,55,${pulse * 0.5})`;
-          ctx.beginPath();
-          ctx.arc(x + (col === 0 ? 8 : TILE_W - 8), y + (row === 0 ? 8 : TILE_H - 8), 3, 0, Math.PI * 2);
-          ctx.fill();
+  private fireProjectile(caster: BattleChar, spell: SpellType, targetId: number) {
+    const target = this.chars.find(c => c.id === targetId);
+    if (!target?.model || !caster.model) return;
+    const from = caster.model.position.clone().add(new THREE.Vector3(0, 2, 0));
+    const to = target.model.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), new THREE.MeshBasicMaterial({ color: SPELL_COLORS[spell], transparent: true, opacity: 0.9 }));
+    mesh.position.copy(from);
+    this.scene.add(mesh);
+    this.projectiles.push({
+      spell, mesh, from, to, progress: 0, speed: spell === "lightning" ? 25 : 15, alive: true,
+      onImpact: () => {
+        if (spell === "heal") {
+          const amt = 20 + Math.floor(Math.random() * 15);
+          target.hp = Math.min(target.maxHp, target.hp + amt);
+          this.addLog(`${caster.name} heals ${target.name} for ${amt} HP!`, "heal");
+        } else {
+          const dmg = 15 + Math.floor(Math.random() * 20);
+          target.hp = Math.max(0, target.hp - dmg);
+          target.hitFlash = 0.4;
+          this.addLog(`${caster.name} hits ${target.name} with ${spell.replace("_", " ")} for ${dmg}!`, "damage");
+          if (target.hp <= 0) { target.state = "dead"; this.fadeToAction(target, "death"); this.addLog(`${target.name} defeated!`, "system"); }
         }
-      }
-    }
-
-    // Team zone indicators
-    ctx.fillStyle = "rgba(46,204,113,0.05)";
-    ctx.fillRect(GRID_OFFSET_X, GRID_OFFSET_Y, TILE_W * 3, TILE_H * GRID_ROWS);
-    ctx.fillStyle = "rgba(231,76,60,0.05)";
-    ctx.fillRect(GRID_OFFSET_X + TILE_W * 7, GRID_OFFSET_Y, TILE_W * 3, TILE_H * GRID_ROWS);
-
-    // Zone labels
-    ctx.font = "11px 'Spectral SC', serif";
-    ctx.fillStyle = "rgba(46,204,113,0.3)";
-    ctx.textAlign = "center";
-    ctx.fillText("ALLIES", GRID_OFFSET_X + TILE_W * 1.5, GRID_OFFSET_Y - 10);
-    ctx.fillStyle = "rgba(231,76,60,0.3)";
-    ctx.fillText("ENEMIES", GRID_OFFSET_X + TILE_W * 8.5, GRID_OFFSET_Y - 10);
-    ctx.textAlign = "start";
+        this.onStateChange?.();
+      },
+    });
   }
 
-  private renderCharacter(ctx: CanvasRenderingContext2D, ch: BattleChar) {
-    if (ch.state === "dead") {
-      this.renderDeadCharacter(ctx, ch);
-      return;
-    }
-
-    const { x, y } = ch.pos;
-    const isSelected = ch.id === this.selectedCharId;
-    const bob = ch.state === "idle" ? Math.sin(ch.animTimer * 3) * 2 : 0;
-    const walkBob = (ch.state === "walking" || ch.state === "running")
-      ? Math.abs(Math.sin(ch.animFrame * Math.PI / 2)) * 4 : 0;
-    const drawY = y + bob - walkBob;
-
-    // Shadow
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.beginPath();
-    ctx.ellipse(x, y + CHAR_RADIUS + 4, CHAR_RADIUS * 0.8, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Selection ring
-    if (isSelected) {
-      ctx.strokeStyle = "rgba(212,175,55,0.8)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(x, y + CHAR_RADIUS + 4, CHAR_RADIUS + 6, 8, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Animated selection particles
-      const selAngle = this.gridPulse * 2;
-      for (let i = 0; i < 4; i++) {
-        const sa = selAngle + (i * Math.PI / 2);
-        const sx = x + Math.cos(sa) * (CHAR_RADIUS + 6);
-        const sy = y + CHAR_RADIUS + 4 + Math.sin(sa) * 8;
-        ctx.fillStyle = "rgba(212,175,55,0.6)";
-        ctx.beginPath();
-        ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    // Hit flash
-    const flashAlpha = ch.hitFlashTimer > 0 ? Math.sin(ch.hitFlashTimer * 30) * 0.5 + 0.5 : 0;
-
-    // Character body (main circle with gradient)
-    const teamColor = ch.team === "player" ? CLASS_COLORS[ch.charClass] : "#c0392b";
-    const bodyGrad = ctx.createRadialGradient(x - 6, drawY - 6, 2, x, drawY, CHAR_RADIUS);
-    bodyGrad.addColorStop(0, teamColor);
-    bodyGrad.addColorStop(0.7, teamColor);
-    bodyGrad.addColorStop(1, "rgba(0,0,0,0.5)");
-
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath();
-    ctx.arc(x, drawY, CHAR_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Outline
-    ctx.strokeStyle = ch.team === "player" ? "rgba(212,175,55,0.6)" : "rgba(192,57,43,0.6)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Hit flash overlay
-    if (flashAlpha > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${flashAlpha})`;
-      ctx.beginPath();
-      ctx.arc(x, drawY, CHAR_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Class icon
-    ctx.font = "20px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(CLASS_ICONS[ch.charClass], x, drawY);
-
-    // Casting glow
-    if (ch.state === "casting" && ch.castSpell) {
-      const castProgress = ch.castTimer / ch.castDuration;
-      const c = SPELL_COLORS[ch.castSpell];
-      const glowRadius = CHAR_RADIUS + 10 + Math.sin(this.gridPulse * 6) * 4;
-      ctx.save();
-      ctx.globalAlpha = 0.3 + castProgress * 0.4;
-      ctx.shadowBlur = 20 + castProgress * 20;
-      ctx.shadowColor = c.glow;
-      ctx.strokeStyle = c.primary;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(x, drawY, glowRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      // Cast progress arc
-      ctx.strokeStyle = c.secondary;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(x, drawY, glowRadius + 4, -Math.PI / 2, -Math.PI / 2 + castProgress * Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Name
-    ctx.font = "bold 10px 'Spectral SC', serif";
-    ctx.textAlign = "center";
-    ctx.fillStyle = ch.team === "player" ? "rgba(212,175,55,0.9)" : "rgba(231,76,60,0.9)";
-    ctx.fillText(ch.name, x, drawY - CHAR_RADIUS - 28);
-
-    // Level badge
-    ctx.font = "bold 8px 'Spectral SC', serif";
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText(`Lv.${ch.level}`, x, drawY - CHAR_RADIUS - 18);
-
-    // HP bar
-    const hpBarX = x - HP_BAR_W / 2;
-    const hpBarY = drawY + CHAR_RADIUS + 8;
-    const hpRatio = ch.hp / ch.maxHp;
-    // BG
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(hpBarX - 1, hpBarY - 1, HP_BAR_W + 2, HP_BAR_H + 2);
-    // HP fill
-    const hpColor = hpRatio > 0.6 ? "#2ecc71" : hpRatio > 0.3 ? "#f39c12" : "#e74c3c";
-    ctx.fillStyle = hpColor;
-    ctx.fillRect(hpBarX, hpBarY, HP_BAR_W * hpRatio, HP_BAR_H);
-    // HP glow
-    if (hpRatio < 0.3) {
-      ctx.shadowBlur = 6;
-      ctx.shadowColor = "#e74c3c";
-      ctx.fillRect(hpBarX, hpBarY, HP_BAR_W * hpRatio, HP_BAR_H);
-      ctx.shadowBlur = 0;
-    }
-
-    // MP bar
-    const mpBarY = hpBarY + HP_BAR_H + 2;
-    const mpRatio = ch.mp / ch.maxMp;
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(hpBarX - 1, mpBarY - 1, HP_BAR_W + 2, MP_BAR_H + 2);
-    ctx.fillStyle = "#3498db";
-    ctx.fillRect(hpBarX, mpBarY, HP_BAR_W * mpRatio, MP_BAR_H);
-
-    // Status effect icons
-    let statusX = x - (ch.statusEffects.length * 10) / 2;
-    for (const se of ch.statusEffects) {
-      ctx.fillStyle = STATUS_COLORS[se.type] ?? "#fff";
-      ctx.shadowBlur = 4;
-      ctx.shadowColor = ctx.fillStyle;
-      ctx.beginPath();
-      ctx.arc(statusX + 5, mpBarY + MP_BAR_H + 8, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      statusX += 10;
-    }
-
-    // Walking/running indicator
-    if (ch.state === "walking" || ch.state === "running") {
-      ctx.font = "8px 'Spectral SC', serif";
-      ctx.fillStyle = ch.state === "running" ? "#e74c3c" : "#3498db";
-      ctx.textAlign = "center";
-      ctx.fillText(ch.state === "running" ? "🏃 RUN" : "🚶 WALK", x, drawY - CHAR_RADIUS - 38);
-    }
-
-    ctx.textBaseline = "alphabetic";
-  }
-
-  private renderDeadCharacter(ctx: CanvasRenderingContext2D, ch: BattleChar) {
-    const { x, y } = ch.pos;
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = "#555";
-    ctx.beginPath();
-    ctx.ellipse(x, y + 10, CHAR_RADIUS, CHAR_RADIUS * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.font = "16px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("💀", x, y);
-    ctx.font = "bold 10px 'Spectral SC', serif";
-    ctx.fillStyle = "#888";
-    ctx.fillText(ch.name, x, y - 20);
-    ctx.globalAlpha = 1;
-    ctx.textBaseline = "alphabetic";
-  }
-
-  private renderProjectile(ctx: CanvasRenderingContext2D, proj: SpellProjectile) {
-    const { x, y } = proj.pos;
-    const c = SPELL_COLORS[proj.spell];
-
-    ctx.save();
-
-    // Outer glow
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = c.glow;
-
-    // Core
-    const coreGrad = ctx.createRadialGradient(x, y, 0, x, y, 12);
-    coreGrad.addColorStop(0, "#fff");
-    coreGrad.addColorStop(0.3, c.secondary);
-    coreGrad.addColorStop(1, c.primary);
-    ctx.fillStyle = coreGrad;
-    ctx.beginPath();
-    ctx.arc(x, y, 8, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Extra glow ring
-    ctx.strokeStyle = c.primary;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.4;
-    ctx.beginPath();
-    ctx.arc(x, y, 14, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Lightning bolt special
-    if (proj.spell === "lightning") {
-      ctx.globalAlpha = 0.8;
-      ctx.strokeStyle = c.primary;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      for (let i = 0; i < 4; i++) {
-        ctx.lineTo(
-          x + randomRange(-15, 15),
-          y + randomRange(-15, 15)
-        );
-      }
-      ctx.stroke();
-    }
-
-    ctx.restore();
-  }
-
-  private renderParticle(ctx: CanvasRenderingContext2D, p: Particle) {
-    ctx.save();
-    ctx.globalAlpha = p.alpha;
-
-    if (p.glow > 0) {
-      ctx.shadowBlur = p.glow;
-      ctx.shadowColor = p.color;
-    }
-
-    ctx.fillStyle = p.color;
-
-    switch (p.type) {
-      case "circle":
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * p.alpha, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      case "spark":
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
-        ctx.lineTo(p.x + p.vx * 0.02, p.y + p.vy * 0.02);
-        ctx.stroke();
-        break;
-      case "ring":
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * (1 + (1 - p.alpha) * 3), 0, Math.PI * 2);
-        ctx.stroke();
-        break;
-      case "trail":
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * p.alpha, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-    }
-
-    ctx.restore();
-  }
-
-  // ── Actions ─────────────────────────────────────────────────
-  moveCharTo(charId: number, gx: number, gy: number) {
+  // ── Public actions ────────────────────────────────────────────
+  moveCharTo(charId: number, gx: number, gz: number) {
     const ch = this.chars.find(c => c.id === charId);
     if (!ch || ch.state === "dead" || ch.state === "casting") return;
-    gx = clamp(gx, 0, GRID_COLS - 1);
-    gy = clamp(gy, 0, GRID_ROWS - 1);
-    const target = gridToWorld(gx, gy);
-    const gd = gridDist(ch.gridPos, { x: gx, y: gy });
-    ch.targetPos = target;
-    ch.gridPos = { x: gx, y: gy };
-    ch.state = gd >= RUN_THRESHOLD ? "running" : "walking";
-    ch.animFrame = 0;
-    this.addLog(`${ch.name} ${ch.state === "running" ? "runs" : "walks"} to (${gx},${gy})`, "action");
+    gx = Math.max(0, Math.min(GRID_COLS - 1, gx));
+    gz = Math.max(0, Math.min(GRID_ROWS - 1, gz));
+    const gd = gridDist({ x: ch.gridX, z: ch.gridZ }, { x: gx, z: gz });
+    ch.targetWorldPos = gridToWorld(gx, gz);
+    ch.gridX = gx; ch.gridZ = gz;
+    ch.state = gd >= 3 ? "running" : "walking";
+    this.fadeToAction(ch, ch.state === "running" ? "run" : "walk", "run", "idle");
+    this.addLog(`${ch.name} ${ch.state === "running" ? "runs" : "walks"} to (${gx},${gz})`, "action");
     this.onStateChange?.();
   }
 
@@ -964,183 +613,48 @@ export class BattleEngine {
     const caster = this.chars.find(c => c.id === casterId);
     const target = this.chars.find(c => c.id === targetId);
     if (!caster || !target || caster.state === "dead" || target.state === "dead") return;
-
-    const mpCost = spell === "heal" ? 15 : 10;
-    if (caster.mp < mpCost) {
-      this.addLog(`${caster.name} doesn't have enough MP!`, "system");
-      return;
+    const cost = spell === "heal" ? 15 : 10;
+    if (caster.mp < cost) { this.addLog(`${caster.name} not enough MP!`, "system"); return; }
+    caster.mp -= cost;
+    caster.state = "casting"; caster.castSpell = spell; caster.castTargetId = targetId;
+    caster.castDuration = 1.0; caster.castTimer = 0;
+    this.fadeToAction(caster, "cast", "magic", "attack", "idle");
+    if (caster.model && target.model) {
+      const dir = new THREE.Vector3().subVectors(target.model.position, caster.model.position);
+      caster.model.rotation.y = Math.atan2(dir.x, dir.z);
     }
-    caster.mp -= mpCost;
-
-    caster.state = "casting";
-    caster.castSpell = spell;
-    caster.castTarget = { ...target.pos };
-    caster.castDuration = 1.0;
-    caster.castTimer = 0;
-    caster.facing = Math.atan2(target.pos.y - caster.pos.y, target.pos.x - caster.pos.x);
-
-    this.addLog(`${caster.name} begins casting ${spell.replace("_", " ")}...`, "action");
+    this.addLog(`${caster.name} casting ${spell.replace("_", " ")}...`, "action");
     this.onStateChange?.();
   }
 
-  private fireSpell(caster: BattleChar, spell: SpellType, targetPos: Vec2) {
-    const proj: SpellProjectile = {
-      spell,
-      from: { ...caster.pos },
-      to: { ...targetPos },
-      pos: { ...caster.pos },
-      speed: spell === "lightning" ? 600 : 350,
-      progress: 0,
-      particles: [],
-      alive: true,
-      onImpact: () => {
-        // Find target char at position
-        const target = this.chars.find(c =>
-          c.state !== "dead" && dist(c.pos, targetPos) < CHAR_RADIUS * 2
-        );
-        if (target) {
-          if (spell === "heal") {
-            const healAmt = 20 + Math.floor(Math.random() * 15);
-            target.hp = Math.min(target.maxHp, target.hp + healAmt);
-            this.addLog(`${caster.name} heals ${target.name} for ${healAmt} HP!`, "heal");
-            target.statusEffects.push({ type: "regen", duration: 5, strength: 2 });
-          } else {
-            const dmg = 15 + Math.floor(Math.random() * 20);
-            target.hp = Math.max(0, target.hp - dmg);
-            target.hitFlashTimer = 0.4;
-            this.addLog(`${caster.name} hits ${target.name} with ${spell.replace("_", " ")} for ${dmg} damage!`, "damage");
-
-            // Apply status based on spell
-            if (spell === "fireball") target.statusEffects.push({ type: "burn", duration: 4, strength: 3 });
-            if (spell === "ice_lance") target.statusEffects.push({ type: "freeze", duration: 3, strength: 2 });
-            if (spell === "lightning") target.statusEffects.push({ type: "shock", duration: 2, strength: 4 });
-            if (spell === "shadow_bolt") target.statusEffects.push({ type: "poison", duration: 5, strength: 2 });
-
-            if (target.hp <= 0) {
-              target.state = "dead";
-              this.addLog(`${target.name} has been defeated!`, "system");
-              // Death particles
-              this.particles.push(...spawnImpactParticles(spell, target.pos.x, target.pos.y));
-            }
-          }
-        }
-        this.onStateChange?.();
-      },
-    };
-    this.projectiles.push(proj);
-  }
-
-  autoAttackTarget(attackerId: number, targetId: number) {
-    const attacker = this.chars.find(c => c.id === attackerId);
-    const target = this.chars.find(c => c.id === targetId);
-    if (!attacker || !target || attacker.state === "dead" || target.state === "dead") return;
-
-    attacker.state = "attacking";
-    attacker.facing = Math.atan2(target.pos.y - attacker.pos.y, target.pos.x - attacker.pos.x);
-
+  autoAttack(attackerId: number, targetId: number) {
+    const a = this.chars.find(c => c.id === attackerId);
+    const t = this.chars.find(c => c.id === targetId);
+    if (!a || !t || a.state === "dead" || t.state === "dead") return;
+    this.fadeToAction(a, "attack", "slash", "kick");
+    if (a.model && t.model) a.model.rotation.y = Math.atan2(t.model.position.x - a.model.position.x, t.model.position.z - a.model.position.z);
+    a.state = "attacking";
     const dmg = 8 + Math.floor(Math.random() * 12);
-    target.hp = Math.max(0, target.hp - dmg);
-    target.hitFlashTimer = 0.3;
-
-    // Attack slash particles
-    const angle = Math.atan2(target.pos.y - attacker.pos.y, target.pos.x - attacker.pos.x);
-    for (let i = 0; i < 10; i++) {
-      const a = angle + randomRange(-0.5, 0.5);
-      this.particles.push({
-        x: target.pos.x, y: target.pos.y,
-        vx: Math.cos(a) * randomRange(30, 80),
-        vy: Math.sin(a) * randomRange(30, 80),
-        life: 0.3, maxLife: 0.3, size: randomRange(2, 5),
-        color: "#fff", alpha: 1, gravity: 0, decay: 1, glow: 6,
-        type: "spark",
-      });
-    }
-
-    this.addLog(`${attacker.name} attacks ${target.name} for ${dmg} damage!`, "damage");
-    this.screenShake = { intensity: 3, duration: 0.15, elapsed: 0 };
-
-    if (target.hp <= 0) {
-      target.state = "dead";
-      this.addLog(`${target.name} has been defeated!`, "system");
-    }
-
-    setTimeout(() => {
-      if (attacker.state === "attacking") attacker.state = "idle";
-    }, 400);
-
+    t.hp = Math.max(0, t.hp - dmg); t.hitFlash = 0.3;
+    if (t.model) for (let i = 0; i < 8; i++) this.spawnParticle(t.model.position.clone().add(new THREE.Vector3(0, 1.5, 0)), new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6), 0xffffff, 0.3);
+    this.addLog(`${a.name} attacks ${t.name} for ${dmg}!`, "damage");
+    if (t.hp <= 0) { t.state = "dead"; this.fadeToAction(t, "death"); this.addLog(`${t.name} defeated!`, "system"); }
+    setTimeout(() => { if (a.state === "attacking") { a.state = "idle"; this.fadeToAction(a, "idle"); } }, 800);
     this.onStateChange?.();
   }
 
-  // ── Input ───────────────────────────────────────────────────
-  private handleClick = (e: MouseEvent) => {
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-
-    // Check if clicked on a character
-    for (const ch of this.chars) {
-      if (ch.state === "dead") continue;
-      if (dist(ch.pos, { x: mx, y: my }) < CHAR_RADIUS + 4) {
-        this.selectedCharId = ch.id;
-        this.onSelectionChange?.(ch);
-        return;
-      }
-    }
-
-    // Check if clicked on grid — move selected char
-    const cell = worldToGrid(mx, my);
-    if (cell.x >= 0 && cell.x < GRID_COLS && cell.y >= 0 && cell.y < GRID_ROWS) {
-      if (this.selectedCharId != null) {
-        this.moveCharTo(this.selectedCharId, cell.x, cell.y);
-      }
-    }
-  };
-
-  private handleMouseMove = (e: MouseEvent) => {
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-    const cell = worldToGrid(mx, my);
-    if (cell.x >= 0 && cell.x < GRID_COLS && cell.y >= 0 && cell.y < GRID_ROWS) {
-      this.hoveredCell = cell;
-    } else {
-      this.hoveredCell = null;
-    }
-  };
-
-  // ── Helpers ─────────────────────────────────────────────────
   private addLog(text: string, type: BattleLogEntry["type"]) {
     this.log.push({ time: Date.now(), text, type });
     if (this.log.length > 100) this.log.shift();
-    this.onLogUpdate?.(this.log);
+    this.onLogUpdate?.([...this.log]);
   }
 
-  getPlayerChars(): BattleChar[] {
-    return this.chars.filter(c => c.team === "player");
-  }
-
-  getEnemyChars(): BattleChar[] {
-    return this.chars.filter(c => c.team === "enemy");
-  }
-
-  getSelectedChar(): BattleChar | null {
-    return this.chars.find(c => c.id === this.selectedCharId) ?? null;
-  }
-
-  selectChar(id: number | null) {
-    this.selectedCharId = id;
-    this.onSelectionChange?.(id != null ? this.chars.find(c => c.id === id) ?? null : null);
-  }
-
-  destroy() {
-    this.running = false;
-    this.canvas.removeEventListener("click", this.handleClick);
-    this.canvas.removeEventListener("mousemove", this.handleMouseMove);
-  }
+  getPlayerChars() { return this.chars.filter(c => c.team === "player"); }
+  getEnemyChars() { return this.chars.filter(c => c.team === "enemy"); }
+  getSelectedChar() { return this.chars.find(c => c.id === this.selectedCharId) ?? null; }
+  selectChar(id: number | null) { this.selectedCharId = id; this.onSelectionChange?.(id != null ? this.chars.find(c => c.id === id) ?? null : null); }
+  resize(w: number, h: number) { this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); }
+  destroy() { this.stop(); this.renderer.dispose(); }
 }
 
-export { GRID_COLS, GRID_ROWS, TILE_W, TILE_H, CLASS_ICONS, CLASS_COLORS, SPELL_COLORS };
+export { GRID_COLS, GRID_ROWS, SPELL_COLORS, CDN };
