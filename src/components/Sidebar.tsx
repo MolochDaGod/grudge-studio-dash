@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Gamepad2, Swords, Fish, Joystick, Wrench,
   Server, HardDrive, Database, ScrollText, Rocket,
   Trophy, Layers, Monitor, TableProperties, Search, Coins,
-  Settings2, BookOpen, LogOut,
+  Settings2, BookOpen, LogOut, Crosshair,
 } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 
@@ -30,6 +30,7 @@ const NAV = [
     items: [
       { href: "/lobbies", label: "Lobby Manager", icon: Layers },
       { href: "/arena", label: "Arena", icon: Trophy },
+      { href: "/battle", label: "Battle", icon: Crosshair },
       { href: "/mode-configs", label: "Game Modes", icon: Settings2 },
       { href: "/unity-servers", label: "Headless Servers", icon: Monitor },
       { href: "/tcg", label: "TCG", icon: Layers },

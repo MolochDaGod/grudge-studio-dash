@@ -25,6 +25,7 @@ import Query from "./pages/Query";
 import Economy from "./pages/Economy";
 import ModeConfigs from "./pages/ModeConfigs";
 import Docs from "./pages/Docs";
+import Battle from "./pages/Battle";
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/games/tools" component={Tools} />
           <Route path="/lobbies" component={Lobbies} />
           <Route path="/arena" component={Arena} />
+          <Route path="/battle" component={Battle} />
           <Route path="/tcg" component={TCG} />
           <Route path="/unity-servers" component={UnityServers} />
           <Route path="/services" component={Services} />
