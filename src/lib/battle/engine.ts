@@ -11,6 +11,15 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 // ── Asset CDN ───────────────────────────────────────────────────
 const CDN = "https://assets.grudge-studio.com";
 
+/** Resolve model path — served from public/ (same-origin) in both dev and prod.
+ *  Vite copies public/ to dist/ so Vercel serves them at the same paths.
+ *  Falls back to R2 CDN only if needed via the ASSET_CDN env var. */
+function modelUrl(path: string): string {
+  const cdnOverride = typeof import.meta !== "undefined" && import.meta.env?.VITE_ASSET_CDN_URL;
+  if (cdnOverride) return cdnOverride + path;
+  return path; // same-origin — works in dev AND Vercel prod
+}
+
 // ── Types ───────────────────────────────────────────────────────
 export type RaceId = "human" | "barbarian" | "dwarf" | "elf" | "orc" | "undead";
 export type ClassId = "warrior" | "mage" | "ranger" | "worg";
@@ -350,7 +359,7 @@ export class BattleEngine3D {
       try {
         const raceCfg = RACE_MODELS[def.raceId] ?? RACE_MODELS.human;
         this.onLoadProgress?.(`Loading ${def.name} (${def.raceId})...`);
-        const gltf = await this.loadGLTF(CDN + raceCfg.path);
+        const gltf = await this.loadGLTF(modelUrl(raceCfg.path));
         const model = gltf.scene.clone();
         model.scale.setScalar(raceCfg.scale * 2);
         model.position.set(wp.x, 0, wp.z);

@@ -135,8 +135,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // ── Auth Gate ────────────────────────────────────────────────────
 // Wraps the app — shows login page if not authenticated.
+// In dev mode (Vite DEV), bypass auth for local testing.
 export function AuthGate({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
   const { user, loading } = useAuth();
+
+  // Dev bypass — skip auth gate on localhost so battle page etc. can be tested
+  const isDev = import.meta.env?.DEV;
+  if (isDev) return <>{children}</>;
 
   if (loading) {
     return (
