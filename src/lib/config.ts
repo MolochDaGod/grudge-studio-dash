@@ -8,7 +8,7 @@ export const API = {
   assetsCdn: "https://assets.grudge-studio.com",
 } as const;
 
-export type ServiceKey = "auth" | "api" | "account" | "launcher" | "ws" | "assets-api";
+export type ServiceKey = "auth" | "api" | "account" | "launcher" | "ws" | "assets-api" | "forge-api";
 
 export interface ServiceDef {
   key: ServiceKey;
@@ -24,6 +24,7 @@ export const SERVICES: ServiceDef[] = [
   { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher manifest" },
   { key: "ws", name: "WebSocket", url: `https://${API.ws.replace("wss://", "")}`, description: "ws.grudge-studio.com — Real-time PvP, island, crew events" },
   { key: "assets-api", name: "Asset Service", url: API.assetsApi, description: "assets-api.grudge-studio.com — Upload, metadata, conversions" },
+  { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "forge-api.grudge-studio.com — Scene editor backend, AI worker, R2 storage, navmesh" },
 ];
 
 export type AppCategory = "game" | "editor" | "tool" | "infra" | "web3";
@@ -98,6 +99,17 @@ export const GRUDGE_APPS: GrudgeApp[] = [
     backend: ["none"],
   },
   // ── Editors ───────────────────────────────────────────────
+  {
+    id: "grudge-gameforge",
+    name: "Grudge GameForge",
+    description: "Three.js scene editor — Rapier physics, dual AI assistant, navmesh, Monaco code editor, embeddable player",
+    category: "editor",
+    liveUrl: "https://forge.grudge-studio.com",
+    repo: "MolochDaGod/Grudge-Studio-Forge",
+    icon: "🔥",
+    embeddable: false,
+    backend: ["api", "auth", "minio"],
+  },
   {
     id: "gdevelop-assistant",
     name: "GDevelop Assistant",

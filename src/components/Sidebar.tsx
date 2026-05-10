@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Gamepad2, Swords, Fish, Joystick, Wrench,
   Server, HardDrive, Database, ScrollText, Rocket,
   Trophy, Layers, Monitor, TableProperties, Search, Coins,
-  Settings2, BookOpen, LogOut, Crosshair,
+  Settings2, BookOpen, LogOut, Crosshair, Flame,
 } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 
@@ -23,6 +23,7 @@ const NAV = [
       { href: "/games/angeler", label: "Grudge Angeler", icon: Fish },
       { href: "/games/gdevelop", label: "App Manager", icon: Joystick },
       { href: "/games/tools", label: "Builder & Tools", icon: Wrench },
+      { href: "https://forge.grudge-studio.com", label: "GameForge", icon: Flame },
     ],
   },
   {
