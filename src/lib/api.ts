@@ -51,6 +51,7 @@ export interface HealthResult {
 }
 
 const HEALTH_PATHS: Partial<Record<ServiceKey, string>> = {
+  survival: "/api/health",
   "forge-api": "/api/healthz",
 };
 
@@ -58,7 +59,6 @@ export async function checkHealth(key: ServiceKey): Promise<HealthResult> {
   const svc = SERVICES.find((s) => s.key === key)!;
   const healthPath = HEALTH_PATHS[key] ?? "/health";
   const start = performance.now();
-  const healthPath = key === "survival" ? "/api/health" : "/health";
   try {
     const r = await fetch(`${svc.url}${healthPath}`, { method: "GET", signal: AbortSignal.timeout(8000) });
     let body: any = {};
