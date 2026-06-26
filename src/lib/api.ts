@@ -58,6 +58,7 @@ export async function checkHealth(key: ServiceKey): Promise<HealthResult> {
   const svc = SERVICES.find((s) => s.key === key)!;
   const healthPath = HEALTH_PATHS[key] ?? "/health";
   const start = performance.now();
+  const healthPath = key === "survival" ? "/api/health" : "/health";
   try {
     const r = await fetch(`${svc.url}${healthPath}`, { method: "GET", signal: AbortSignal.timeout(8000) });
     let body: any = {};
@@ -90,17 +91,73 @@ export async function checkDeployment(url: string): Promise<DeployStatus> {
 // GAME API — api.grudge-studio.com
 // ════════════════════════════════════════════════════════════════
 
+export interface AdminStats {
+  success?: boolean;
+  stats?: {
+    totalUsers: number;
+    totalCharacters: number;
+    totalCrews: number;
+    activeUsers24h: number;
+    goldSupply: number;
+    bannedUsers: number;
+    roleBreakdown: Record<string, number>;
+  };
+}
+
+export interface AdminUserRow {
+  id: string | number;
+  username?: string;
+  displayName?: string | null;
+  email?: string | null;
+  grudgeId?: string | null;
+  role?: string | null;
+  faction?: string | null;
+  isPremium?: boolean;
+  isGuest?: boolean;
+  isBanned?: boolean;
+  walletAddress?: string | null;
+  createdAt?: string;
+  lastLoginAt?: string | null;
+}
+
+export interface AccountProfile {
+  grudgeId: string;
+  source: "game-api" | "survival";
+  id?: string | number;
+  username?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+  role?: string | null;
+  walletAddress?: string | null;
+  lastLoginAt?: string | null;
+  characters?: any[];
+  wallets?: any[];
+  arenaStats?: any;
+  survival?: {
+    account: any;
+    characters: any[] | null;
+  };
+}
+
 export const gameApi = {
-  characters:     () => fetcher<any[]>(`${API.api}/characters`),
+  characters:     () => fetcher<any[]>(`${API.api}/characters`).catch(() => [] as any[]),
   character:      (id: number) => fetcher<any>(`${API.api}/characters/${id}`),
-  islands:        () => fetcher<any[]>(`${API.api}/islands`),
-  missions:       () => fetcher<any[]>(`${API.api}/missions`),
-  crews:          () => fetcher<any[]>(`${API.api}/crews`),
-  craftingRecipes:() => fetcher<any[]>(`${API.api}/crafting/recipes`),
-  // Aliases used by game pages
-  items:          () => fetcher<any[]>(`${API.api}/items`),
-  crafting:       () => fetcher<any[]>(`${API.api}/crafting`),
-  skills:         () => fetcher<any[]>(`${API.api}/skills`),
+  islands:        () => fetcher<any[]>(`${API.api}/islands`).catch(() => [] as any[]),
+  missions:       () => fetcher<any[]>(`${API.api}/missions`).catch(() => [] as any[]),
+  crews:          () => fetcher<any[]>(`${API.api}/crews`).catch(() => [] as any[]),
+  craftingRecipes:() => fetcher<any[]>(`${API.api}/crafting/recipes`).catch(() => [] as any[]),
+  items:          () => fetcher<any[]>(`${API.api}/items`).catch(() => [] as any[]),
+  crafting:       () => fetcher<any[]>(`${API.api}/crafting`).catch(() => [] as any[]),
+  skills:         () => fetcher<any[]>(`${API.api}/skills`).catch(() => [] as any[]),
+};
+
+/** Survival / Grudox MMO API */
+export const survivalApi = {
+  account: (grudgeId: string) =>
+    safeFetcher<any>(`${API.survival}/api/accounts/${encodeURIComponent(grudgeId)}`),
+  characters: (accountId: string) =>
+    safeFetcher<any[]>(`${API.survival}/api/characters?accountId=${encodeURIComponent(accountId)}`),
+  health: () => safeFetcher<any>(`${API.survival}/api/health`),
 };
 
 // PvP — status param now works on backend (default: 'waiting')
@@ -125,29 +182,61 @@ export const economyApi = {
 // IDENTITY ADMIN — id.grudge-studio.com/admin (correct service owner)
 // ════════════════════════════════════════════════════════════════
 
-// User management goes directly to grudge-id (the identity service owner)
-// grudge-id /admin/users has search, pagination, role change, ban, and full stats.
+// User management — api.grudge-studio.com/api/admin/* (grudge-backend VPS)
 export const accountApi = {
-  list:     (q?: string, limit = 50, offset = 0) =>
-    fetcher<{ users: any[]; total: number }>(`${API.auth}/admin/users?limit=${limit}&offset=${offset}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
-  profile:  (grudgeId: string) =>
-    // game-api has character info; grudge-id has identity info — combine both
-    Promise.all([
-      safeFetcher<any>(`${API.auth}/admin/users?q=${grudgeId}&limit=1`),
-      safeFetcher<any>(`${API.api}/admin/accounts/${grudgeId}`),
-    ]).then(([id, game]) => ({ ...id?.users?.[0], ...game })),
-  sessions: () => fetcher<any[]>(`${API.api}/admin/accounts/sessions`),
-  auditLog: () => fetcher<any[]>(`${API.api}/admin/accounts/audit-log`),
-  // Stats: grudge-id owns identity stats (roles, active users, guests)
-  identityStats: () => fetcher<any>(`${API.auth}/admin/stats`),
-  // Ban/role: go directly to grudge-id (it owns the users table for identity)
-  banUser:  (grudgeId: string, banned: boolean, reason?: string) =>
-    fetcher<any>(`${API.auth}/admin/users/${grudgeId}/ban`, {
-      method: "PATCH",
+  list: (q?: string, page = 1, limit = 50) =>
+    fetcher<{ success: boolean; users: AdminUserRow[]; pagination: { total: number; page: number; limit: number } }>(
+      `${API.api}/admin/users?page=${page}&limit=${limit}${q ? `&search=${encodeURIComponent(q)}` : ""}`,
+    ),
+  byId: (userId: string | number) =>
+    fetcher<{ success: boolean; user: AdminUserRow; characters: any[]; wallets: any[]; arenaStats: any }>(
+      `${API.api}/admin/users/${userId}`,
+    ),
+  profileByGrudgeId: async (grudgeId: string): Promise<AccountProfile> => {
+    const listed = await safeFetcher<{ users: AdminUserRow[] }>(
+      `${API.api}/admin/users?search=${encodeURIComponent(grudgeId)}&limit=1`,
+    );
+    const row = listed?.users?.[0];
+    const survivalAcct = await survivalApi.account(grudgeId);
+    const survivalChars = survivalAcct?.id
+      ? await survivalApi.characters(survivalAcct.id)
+      : null;
+    const survivalBlock = { account: survivalAcct, characters: survivalChars };
+
+    if (!row?.id) {
+      return { grudgeId, source: "survival", survival: survivalBlock };
+    }
+
+    const detail = await safeFetcher<{ user: AdminUserRow; characters: any[]; wallets: any[]; arenaStats: any }>(
+      `${API.api}/admin/users/${row.id}`,
+    );
+    const user = detail?.user;
+    return {
+      grudgeId: user?.grudgeId ?? grudgeId,
+      source: "game-api",
+      id: user?.id,
+      username: user?.username ?? null,
+      displayName: user?.displayName ?? null,
+      email: user?.email ?? null,
+      role: user?.role ?? null,
+      walletAddress: user?.walletAddress ?? null,
+      lastLoginAt: user?.lastLoginAt ?? null,
+      characters: detail?.characters ?? [],
+      wallets: detail?.wallets ?? [],
+      arenaStats: detail?.arenaStats ?? null,
+      survival: survivalBlock,
+    };
+  },
+  sessions: () => safeFetcher<any[]>(`${API.api}/admin/accounts/sessions`).then((r) => r ?? []),
+  auditLog: () => safeFetcher<any[]>(`${API.api}/admin/accounts/audit-log`).then((r) => r ?? []),
+  identityStats: () => safeFetcher<AdminStats>(`${API.api}/admin/stats`),
+  banUser: (userId: string | number, banned: boolean, reason?: string) =>
+    fetcher<any>(`${API.api}/admin/users/${userId}/ban`, {
+      method: "POST",
       body: JSON.stringify({ banned, reason }),
     }),
-  setRole:  (grudgeId: string, role: string) =>
-    fetcher<any>(`${API.auth}/admin/users/${grudgeId}/role`, {
+  setRole: (userId: string | number, role: string) =>
+    fetcher<any>(`${API.api}/admin/users/${userId}/role`, {
       method: "PATCH",
       body: JSON.stringify({ role }),
     }),
@@ -163,7 +252,7 @@ export const adminApi = {
   dbSchema:       (table: string) => fetcher<any[]>(`${API.api}/admin/db/schema/${table}`),
   dbQuery:        (sql: string) => fetcher<any>(`${API.api}/admin/db/query`, { method: "POST", body: JSON.stringify({ sql }) }),
   // game stats: characters, matches, lobbies, gold, redis keys
-  gameStats:      () => safeFetcher<any>(`${API.api}/admin/stats`),
+  gameStats:      () => safeFetcher<AdminStats>(`${API.api}/admin/stats`),
   containers:      () => safeFetcher<any[]>(`${API.api}/admin/containers`),
   containerRestart:(id: string) => fetcher<any>(`${API.api}/admin/containers/${id}/restart`, { method: "POST" }),
   containerLogs:  (id: string, lines = 100) => fetcher<any>(`${API.api}/admin/containers/${id}/logs?lines=${lines}`),

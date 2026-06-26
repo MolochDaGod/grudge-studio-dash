@@ -2,13 +2,77 @@ export const API = {
   auth: import.meta.env.VITE_AUTH_URL || "https://id.grudge-studio.com",
   api: import.meta.env.VITE_API_URL || "https://api.grudge-studio.com",
   account: import.meta.env.VITE_ACCOUNT_URL || "https://account.grudge-studio.com",
+  survival: import.meta.env.VITE_SURVIVAL_API_URL || "https://survival-api-production.up.railway.app",
   launcher: import.meta.env.VITE_LAUNCHER_URL || "https://launcher.grudge-studio.com",
   ws: import.meta.env.VITE_WS_URL || "wss://ws.grudge-studio.com",
   assetsApi: "https://assets-api.grudge-studio.com",
   assetsCdn: "https://assets.grudge-studio.com",
 } as const;
 
-export type ServiceKey = "auth" | "api" | "account" | "launcher" | "ws" | "assets-api" | "forge-api";
+/** Role hierarchy — mirrors grudge-backend/server/auth.ts ROLE_LEVELS */
+export const ROLE_LEVELS: Record<string, number> = {
+  guest: 0,
+  pleb: 1,
+  member: 2,
+  admin: 3,
+  master: 4,
+};
+
+export function roleLevel(role?: string | null): number {
+  if (!role) return 0;
+  return ROLE_LEVELS[role] ?? 0;
+}
+
+/** Flagship games shown in the top launcher bar */
+export interface FlagshipGame {
+  id: "warlords" | "carrier" | "grudox";
+  label: string;
+  short: string;
+  icon: string;
+  liveUrl: string;
+  dashPath: string;
+  repo: string;
+  description: string;
+  apiBase?: keyof typeof API;
+}
+
+export const FLAGSHIP_GAMES: FlagshipGame[] = [
+  {
+    id: "warlords",
+    label: "Warlords",
+    short: "Warlords",
+    icon: "⚔️",
+    liveUrl: "https://grudgewarlords.com",
+    dashPath: "/games/warlords",
+    repo: "MolochDaGod/Grudge-Builder",
+    description: "Souls-like MMO — craft, fight, build empires",
+    apiBase: "api",
+  },
+  {
+    id: "carrier",
+    label: "Carrier",
+    short: "Carrier",
+    icon: "🛸",
+    liveUrl: "https://armada.grudge-studio.com",
+    dashPath: "/games/carrier",
+    repo: "MolochDaGod/grim-armada-web",
+    description: "Grim Armada — tactical carrier combat & colony ops",
+    apiBase: "api",
+  },
+  {
+    id: "grudox",
+    label: "Grudox",
+    short: "Grudox",
+    icon: "🧟",
+    liveUrl: "https://grudges.grudge-studio.com/arpg-game/",
+    dashPath: "/games/grudox",
+    repo: "MolochDaGod/survival",
+    description: "Survival ARPG — characters, saves, encampment world",
+    apiBase: "survival",
+  },
+];
+
+export type ServiceKey = "auth" | "api" | "account" | "survival" | "launcher" | "ws" | "assets-api" | "forge-api";
 
 export interface ServiceDef {
   key: ServiceKey;
@@ -21,6 +85,7 @@ export const SERVICES: ServiceDef[] = [
   { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Authentication, JWT, OAuth" },
   { key: "api", name: "Game API", url: API.api, description: "api.grudge-studio.com — Characters, PvP, economy, crafting" },
   { key: "account", name: "Account API", url: API.account, description: "account.grudge-studio.com — Profiles, friends, achievements" },
+  { key: "survival", name: "Survival API", url: API.survival, description: "Grudox — accounts, characters, world saves (Railway)" },
   { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher manifest" },
   { key: "ws", name: "WebSocket", url: `https://${API.ws.replace("wss://", "")}`, description: "ws.grudge-studio.com — Real-time PvP, island, crew events" },
   { key: "assets-api", name: "Asset Service", url: API.assetsApi, description: "assets-api.grudge-studio.com — Upload, metadata, conversions" },

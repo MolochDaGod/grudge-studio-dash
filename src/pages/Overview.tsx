@@ -19,14 +19,14 @@ export default function Overview() {
   // Identity stats: role breakdown, active players (from grudge-id)
   const idStats = useQuery({ queryKey: ["id-stats"], queryFn: accountApi.identityStats, refetchInterval: 60_000 });
 
-  const g = gameStats.data;
-  const id = idStats.data;
+  const stats = idStats.data?.stats ?? gameStats.data?.stats;
+  const roles = stats?.roleBreakdown ?? {};
 
   const onlineServices = health.data?.filter((s) => s.ok).length ?? 0;
   const totalServices  = SERVICES.length;
   const onlineApps     = deploys.data?.filter((d) => d.online).length ?? 0;
-  const totalAccounts  = id?.total ?? g?.total_accounts ?? "—";
-  const active24h      = id?.active_24h ?? "—";
+  const totalAccounts  = stats?.totalUsers ?? "—";
+  const active24h      = stats?.activeUsers24h ?? "—";
 
   return (
     <div>
@@ -43,9 +43,9 @@ export default function Overview() {
       {/* Second row: player activity + game economy */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard icon="🔋" value={active24h} label="Active (24h)" />
-        <StatCard icon="🛡️" value={id?.members ?? "—"} label="Members" />
-        <StatCard icon="⚿" value={g?.total_characters ?? "—"} label="Characters" />
-        <StatCard icon="💰" value={g?.gold_circulating?.toLocaleString() ?? "—"} label="Gold Circulating" />
+        <StatCard icon="🛡️" value={roles.member ?? "—"} label="Members" />
+        <StatCard icon="⚿" value={stats?.totalCharacters ?? "—"} label="Characters" />
+        <StatCard icon="💰" value={stats?.goldSupply != null ? Number(stats.goldSupply).toLocaleString() : "—"} label="Gold Circulating" />
       </div>
 
       <section className="mb-6">

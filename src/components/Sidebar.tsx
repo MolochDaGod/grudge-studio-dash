@@ -16,10 +16,18 @@ const NAV = [
     ],
   },
   {
-    section: "Games",
+    section: "Flagship Games",
+    items: [
+      { href: "/games/warlords", label: "Warlords", icon: Swords },
+      { href: "/games/carrier", label: "Carrier", icon: Gamepad2 },
+      { href: "/games/grudox", label: "Grudox", icon: Crosshair },
+    ],
+  },
+  {
+    section: "More Games",
     items: [
       { href: "/games/unity", label: "Unity Game", icon: Gamepad2 },
-      { href: "/games/grudge-wars", label: "Grudge Wars", icon: Swords },
+      { href: "/games/grudge-wars", label: "Grudge Wars (legacy)", icon: Swords },
       { href: "/games/angeler", label: "Grudge Angeler", icon: Fish },
       { href: "/games/gdevelop", label: "App Manager", icon: Joystick },
       { href: "/games/tools", label: "Builder & Tools", icon: Wrench },
@@ -68,7 +76,7 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="fantasy-panel fixed left-0 top-0 bottom-0 w-56 flex flex-col z-50 overflow-y-auto">
+    <aside className="fantasy-panel fixed left-0 top-12 bottom-0 w-56 flex flex-col z-50 overflow-y-auto">
       {/* Logo */}
       <div className="p-4 border-b border-border">
         <a href="https://grudge-studio.com" className="block" target="_self" rel="noopener noreferrer">

@@ -1,10 +1,14 @@
 import { Route, Switch } from "wouter";
 import Sidebar from "./components/Sidebar";
+import GamesTopBar from "./components/GamesTopBar";
 
 // Pages
 import Overview from "./pages/Overview";
 import Accounts from "./pages/Accounts";
 import UnityGame from "./pages/games/UnityGame";
+import Warlords from "./pages/games/Warlords";
+import Carrier from "./pages/games/Carrier";
+import Grudox from "./pages/games/Grudox";
 import GrudgeWars from "./pages/games/GrudgeWars";
 import Angeler from "./pages/games/Angeler";
 import GDevelop from "./pages/games/GDevelop";
@@ -28,11 +32,15 @@ import Battle from "./pages/Battle";
 export default function App() {
   return (
     <div className="min-h-screen">
+      <GamesTopBar />
       <Sidebar />
-      <main className="ml-56 p-6">
+      <main className="ml-56 pt-14 p-6">
         <Switch>
           <Route path="/" component={Overview} />
           <Route path="/accounts" component={Accounts} />
+          <Route path="/games/warlords" component={Warlords} />
+          <Route path="/games/carrier" component={Carrier} />
+          <Route path="/games/grudox" component={Grudox} />
           <Route path="/games/unity" component={UnityGame} />
           <Route path="/games/grudge-wars" component={GrudgeWars} />
           <Route path="/games/angeler" component={Angeler} />

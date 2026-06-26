@@ -1,14 +1,15 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import TopBar from "../components/TopBar";
-import { dbApi } from "../lib/api";
+import { dbApi, accountApi } from "../lib/api";
+import { roleLevel } from "../lib/config";
 import { useState } from "react";
-import { Play, Copy } from "lucide-react";
+import { Play, Copy, Search } from "lucide-react";
 
 const EXAMPLE_QUERIES = [
   "SELECT COUNT(*) AS total FROM users;",
-  "SELECT id, display_name, wallet_address FROM users LIMIT 20;",
-  "SELECT c.id, c.name, c.race, c.class, u.display_name FROM characters c JOIN users u ON c.user_id = u.id LIMIT 20;",
-  "SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = 'grudge_game';",
+  "SELECT id, username, grudge_id, role, email, last_login_at FROM users ORDER BY last_login_at DESC LIMIT 25;",
+  "SELECT role, COUNT(*) AS count FROM users GROUP BY role ORDER BY count DESC;",
+  "SELECT c.id, c.name, c.level, c.gold, u.username, u.grudge_id FROM characters c JOIN users u ON c.user_id = u.id LIMIT 20;",
   "SELECT * FROM battle_arena_stats ORDER BY total_kills DESC LIMIT 10;",
 ];
 
@@ -17,6 +18,14 @@ export default function Query() {
   const [results, setResults] = useState<any[] | null>(null);
   const [error, setError] = useState("");
   const [execTime, setExecTime] = useState(0);
+  const [grudgeId, setGrudgeId] = useState("");
+  const [lookup, setLookup] = useState("");
+
+  const accountLookup = useQuery({
+    queryKey: ["query-account", lookup],
+    queryFn: () => accountApi.profileByGrudgeId(lookup),
+    enabled: lookup.length >= 3,
+  });
 
   const queryMut = useMutation({
     mutationFn: async (query: string) => {
@@ -40,7 +49,49 @@ export default function Query() {
     <div>
       <TopBar title="SQL Query" />
 
-      <p className="text-sm text-muted-foreground mb-4">Run read-only queries against the Grudge database.</p>
+      <p className="text-sm text-muted-foreground mb-4">
+        Account-level API lookup + read-only SQL against the Grudge database.
+      </p>
+
+      {/* Account API lookup */}
+      <section className="fantasy-panel p-4 mb-6">
+        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+          <Search size={16} /> Account info (API)
+        </h2>
+        <form
+          className="flex gap-2 mb-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setLookup(grudgeId.trim());
+          }}
+        >
+          <input
+            type="text"
+            value={grudgeId}
+            onChange={(e) => setGrudgeId(e.target.value)}
+            placeholder="grudgeId"
+            className="flex-1 bg-input border border-border rounded px-3 py-2 text-sm"
+          />
+          <button type="submit" className="gilded-button px-4 py-2 text-xs">Lookup</button>
+        </form>
+        {accountLookup.data && (
+          <pre className="text-xs overflow-x-auto bg-input/50 p-3 rounded border border-border max-h-48">
+            {JSON.stringify(
+              {
+                grudgeId: accountLookup.data.grudgeId ?? lookup,
+                role: accountLookup.data.role,
+                roleLevel: roleLevel(accountLookup.data.role),
+                username: accountLookup.data.username,
+                warlordsCharacters: accountLookup.data.characters?.length,
+                grudoxAccount: accountLookup.data.survival?.account?.id ?? null,
+                grudoxCharacters: accountLookup.data.survival?.characters?.length ?? 0,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        )}
+      </section>
 
       {/* Query input */}
       <div className="mb-4">
