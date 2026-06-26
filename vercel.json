@@ -1,24 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm ci",
-  "buildCommand": "npm run build",
+  "installCommand": "echo skip",
+  "buildCommand": "echo skip",
   "outputDirectory": "dist",
-  "framework": "vite",
+  "framework": null,
   "regions": ["iad1"],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "redirects": [
+    { "source": "/play", "destination": "https://play.grudge-studio.com/", "permanent": true },
+    { "source": "/play/:path*", "destination": "https://play.grudge-studio.com/:path*", "permanent": true }
+  ],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://api.grudge-studio.com/api/:path*" },
+    { "source": "/assets-cdn/:path*", "destination": "https://assets.grudge-studio.com/:path*" },
+    { "source": "/((?!api/|assets-cdn/|assets/|favicon|robots\\.txt|manifest|.*\\..*).*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
-    {
-      "source": "/models/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=604800" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
-      ]
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
   ]
 }

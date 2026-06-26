@@ -1,5 +1,5 @@
 node_modules
-dist
+# dist is committed for prebuilt player-dash deploys to dash.grudge-studio.com
 .env
 *.local
 .vercel
