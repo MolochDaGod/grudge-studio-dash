@@ -151,6 +151,70 @@ export const gameApi = {
   skills:         () => fetcher<any[]>(`${API.api}/skills`).catch(() => [] as any[]),
 };
 
+export interface EngineControllerSummary {
+  id: string;
+  label: string;
+  driver: string;
+  worldScale: number;
+}
+
+export interface EngineCameraSummary {
+  id: string;
+  label: string;
+  mode: string;
+  fov: number;
+}
+
+export interface EngineAnimLibrarySummary {
+  id: string;
+  label: string;
+  rig: string;
+  clipCount: number;
+}
+
+export interface EngineManifestSummary {
+  version: number;
+  era: string;
+  unit: string;
+  updatedAt: string;
+  controllers: EngineControllerSummary[];
+  cameras: EngineCameraSummary[];
+  animationLibraries: EngineAnimLibrarySummary[];
+  pipeline: { cdnBase: string; defaultCharacterHeightM: number };
+  libraries: Record<string, string | undefined>;
+}
+
+interface EngineManifestRaw {
+  version: number;
+  era: string;
+  unit: string;
+  updatedAt: string;
+  controllers?: EngineControllerSummary[];
+  cameras?: EngineCameraSummary[];
+  animationLibraries?: { id: string; label: string; rig: string; clipMap?: Record<string, string> }[];
+  pipeline?: { cdnBase: string; defaultCharacterHeightM: number };
+  libraries?: Record<string, string | undefined>;
+}
+
+function normalizeEngineManifest(m: EngineManifestRaw): EngineManifestSummary {
+  return {
+    version: m.version,
+    era: m.era,
+    unit: m.unit,
+    updatedAt: m.updatedAt,
+    controllers: m.controllers ?? [],
+    cameras: m.cameras ?? [],
+    animationLibraries: (m.animationLibraries ?? []).map((lib) => ({
+      id: lib.id,
+      label: lib.label,
+      rig: lib.rig,
+      clipCount: Object.keys(lib.clipMap ?? {}).length,
+    })),
+    pipeline: m.pipeline ?? { cdnBase: "", defaultCharacterHeightM: 1.8 },
+    libraries: m.libraries ?? {},
+  };
+}
+
 /** Survival / Grudox MMO API */
 export const survivalApi = {
   account: (grudgeId: string) =>
@@ -158,6 +222,10 @@ export const survivalApi = {
   characters: (accountId: string) =>
     safeFetcher<any[]>(`${API.survival}/api/characters?accountId=${encodeURIComponent(accountId)}`),
   health: () => safeFetcher<any>(`${API.survival}/api/health`),
+  engineManifest: (): Promise<EngineManifestSummary | null> =>
+    safeFetcher<EngineManifestRaw>(`${API.survival}/api/engine/manifest`).then((m) =>
+      m ? normalizeEngineManifest(m) : null,
+    ),
 };
 
 // PvP — status param now works on backend (default: 'waiting')

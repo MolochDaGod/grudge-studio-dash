@@ -54,6 +54,13 @@ export default function GameHub({ game }: GameHubProps) {
     refetchInterval: 60_000,
   });
 
+  const engineManifest = useQuery({
+    queryKey: ["survival-engine-manifest"],
+    queryFn: survivalApi.engineManifest,
+    enabled: game.id === "grudox",
+    refetchInterval: 300_000,
+  });
+
   const characters = useQuery({
     queryKey: ["gw-characters"],
     queryFn: gameApi.characters,
@@ -161,7 +168,8 @@ export default function GameHub({ game }: GameHubProps) {
         {game.id === "grudox" && (
           <>
             <StatCard icon="🧍" value={survivalChars.data?.length ?? "—"} label="Characters" />
-            <StatCard icon="💾" value={survivalAccount.data ? "Found" : "—"} label="Account" />
+            <StatCard icon="⚙️" value={engineManifest.data?.controllers.length ?? "—"} label="Controllers" />
+            <StatCard icon="🎬" value={engineManifest.data?.animationLibraries.length ?? "—"} label="Anim Libs" />
             <StatCard icon="🔗" value="Railway" label="API Host" />
           </>
         )}
@@ -219,8 +227,88 @@ export default function GameHub({ game }: GameHubProps) {
       )}
 
       {game.id === "grudox" && (
+        <section className="fantasy-panel p-5 mb-6">
+          <h2 className="text-lg mb-2">Grudge Nexus Era</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Grudox is the public entry to Survival — a low-poly / voxel-forward Nexus world map with
+            Quaternius animated characters, grudge-control third-person locomotion, and Grudge ID saves.
+            LED mask CNFT sales and mask AI live on the landing; the ARPG client is the playable build.
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            <a
+              href={game.liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="gilded-button inline-block px-4 py-2 text-xs"
+            >
+              Entry · LED Masks →
+            </a>
+            {game.playUrl && (
+              <a
+                href={game.playUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block px-4 py-2 text-xs rounded border border-primary text-primary hover:bg-primary/10"
+              >
+                Play Nexus →
+              </a>
+            )}
+          </div>
+        </section>
+      )}
+
+      {game.id === "grudox" && engineManifest.data && (
+        <section className="fantasy-panel p-5 mb-6">
+          <h2 className="text-lg mb-2">Nexus Engine Manifest</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            v{engineManifest.data.version} · {engineManifest.data.era} · {engineManifest.data.unit} · updated{" "}
+            {new Date(engineManifest.data.updatedAt).toLocaleDateString()}
+          </p>
+          <div className="grid md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <h3 className="text-xs uppercase text-muted-foreground mb-2">Controllers</h3>
+              <ul className="space-y-1">
+                {engineManifest.data.controllers.map((c) => (
+                  <li key={c.id}>
+                    <span className="text-primary">{c.id}</span>
+                    <span className="text-muted-foreground"> · {c.driver} · scale {c.worldScale}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-xs uppercase text-muted-foreground mb-2">Cameras</h3>
+              <ul className="space-y-1">
+                {engineManifest.data.cameras.map((c) => (
+                  <li key={c.id}>
+                    <span className="text-primary">{c.id}</span>
+                    <span className="text-muted-foreground"> · {c.mode} · fov {c.fov}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-xs uppercase text-muted-foreground mb-2">Animation Libraries</h3>
+              <ul className="space-y-1">
+                {engineManifest.data.animationLibraries.map((lib) => (
+                  <li key={lib.id}>
+                    <span className="text-primary">{lib.id}</span>
+                    <span className="text-muted-foreground"> · {lib.rig} · {lib.clipCount} clips</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            CDN: {engineManifest.data.pipeline.cdnBase} · default height{" "}
+            {engineManifest.data.pipeline.defaultCharacterHeightM}m
+          </p>
+        </section>
+      )}
+
+      {game.id === "grudox" && (
         <section>
-          <h2 className="text-lg mb-3">Account lookup (Survival API)</h2>
+          <h2 className="text-lg mb-3">Account lookup (Nexus API)</h2>
           <div className="flex gap-2 mb-4">
             <input
               type="text"
