@@ -354,6 +354,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
   <div class="sep"></div>
   <div class="tbadge ok" id="statusBadge">● <span id="statusText">Polling…</span></div>
   <div class="tbadge" id="bridgeBadge">○ Bridge offline</div>
+  <div class="tbadge" id="liveBadge">○ SSE off</div>
   <div class="tbar-r">
     <button class="op-pill" id="opPill" type="button" title="Sign out">—</button>
     <div class="clock" id="clock"></div>
@@ -723,6 +724,9 @@ const state = {
   liveConnected: false,
   liveStreamAbort: null,
   liveReconnectTimer: null,
+  obsSources: null,
+  debugWorkers: null,
+  debugWorkerPreview: null,
   selectedAcct: null,
 };
 
@@ -906,6 +910,12 @@ function updateBadges(issues) {
   fetch(`${BRIDGE}/health`, { method:'GET', cache:'no-store', signal: AbortSignal.timeout(5000) })
     .then(() => { bb.className = 'tbadge ok'; bb.textContent = '● Bridge online'; })
     .catch(() => { bb.className = 'tbadge'; bb.textContent = '○ Bridge offline (demo)'; });
+
+  const lb = $('liveBadge');
+  if (lb) {
+    if (state.liveConnected) { lb.className = 'tbadge ok'; lb.textContent = '● SSE live'; }
+    else { lb.className = 'tbadge'; lb.textContent = '○ SSE off'; }
+  }
 }
 
 function pushEvent(evt) {
@@ -966,6 +976,7 @@ async function startBridgeLiveStream() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     if (!r.body) throw new Error('No stream body');
     state.liveConnected = true;
+    updateBadges(0);
     pushEvent({ ts: Date.now(), level: 'info', source: 'bridge-live', message: 'SSE stream connected' });
     if (state.tab === 'logs') render();
     const reader = r.body.getReader();
@@ -983,6 +994,7 @@ async function startBridgeLiveStream() {
   } catch (e) {
     if (e.name === 'AbortError') return;
     state.liveConnected = false;
+    updateBadges(0);
     if (state.tab === 'logs') render();
     state.liveReconnectTimer = setTimeout(() => startBridgeLiveStream(), 5000);
   }
@@ -1087,7 +1099,7 @@ function render() {
   if (tab === 'logs')     m.innerHTML = renderLogs();
   if (tab === 'accounts') m.innerHTML = renderAccounts();
   if (tab === 'relays')   m.innerHTML = renderRelays();
-  if (tab === 'settings') m.innerHTML = renderSettings();
+  if (tab === 'settings') { m.innerHTML = renderSettings(); if (sessionStorage.getItem('gs_admin_key')) loadDebugPanels(); }
   bindMainHandlers();
 }
 
@@ -1706,16 +1718,71 @@ function renderRelays() {
 /* ─────────────────────────────────────────────────────
    TAB: SETTINGS
    ───────────────────────────────────────────────────── */
+function saveAdminKey() {
+  const v = $('adminKeyInput')?.value?.trim();
+  if (v) sessionStorage.setItem('gs_admin_key', v);
+  else sessionStorage.removeItem('gs_admin_key');
+  loadDebugPanels();
+  render();
+}
+
+async function loadDebugPanels() {
+  if (!sessionStorage.getItem('gs_admin_key')) {
+    state.obsSources = null;
+    state.debugWorkers = null;
+    return;
+  }
+  try {
+    const [srcR, listR] = await Promise.all([
+      fetch(`${OBS}/admin/sources`, { headers: operatorHeaders(), cache: 'no-store' }),
+      fetch(`${BRIDGE}/code/list`, { headers: operatorHeaders(), cache: 'no-store' }),
+    ]);
+    state.obsSources = srcR.ok ? (await srcR.json()).sources : [{ error: `sources ${srcR.status}` }];
+    state.debugWorkers = listR.ok ? (await listR.json()).workers : [{ error: `code/list ${listR.status}` }];
+  } catch (e) {
+    state.obsSources = [{ error: String(e.message || e) }];
+    state.debugWorkers = null;
+  }
+  if (state.tab === 'settings') render();
+}
+
+async function previewWorker(name) {
+  state.debugWorkerPreview = { loading: true, name };
+  render();
+  try {
+    const r = await fetch(`${BRIDGE}/code/${encodeURIComponent(name)}`, { headers: operatorHeaders() });
+    const d = await r.json();
+    state.debugWorkerPreview = { name, ok: r.ok, preview: d.preview || d.error || JSON.stringify(d) };
+  } catch (e) {
+    state.debugWorkerPreview = { name, ok: false, preview: String(e.message || e) };
+  }
+  render();
+}
+
 function renderSettings() {
+  const adminSet = !!sessionStorage.getItem('gs_admin_key');
   return `
-    <div class="ph"><div><h2>Settings</h2><p>Console configuration. All read-only — runtime config lives in the wrangler.toml of each worker.</p></div></div>
+    <div class="ph"><div><h2>Settings</h2><p>Operator session + optional fleet admin key unlocks observatory sources and worker code preview.</p></div>
+      <div class="ph-r"><button class="tbtn" onclick="loadDebugPanels()">↻ Refresh debug</button></div></div>
     <div class="body">
+      <div class="card">
+        <div class="card-h"><h3>Fleet Admin Key</h3><span class="csub">${adminSet ? 'set (session)' : 'not set'}</span></div>
+        <div class="card-b">
+          <div style="font-size:11px;color:var(--ink-dim);margin-bottom:8px">Unlocks <code>/admin/sources</code> and <code>/code/*</code>. Set via <code>wrangler secret put ADMIN_KEY</code> on observatory + bridge.</div>
+          <div style="display:flex;gap:8px">
+            <input class="input" id="adminKeyInput" type="password" placeholder="x-admin-key value…" style="flex:1"/>
+            <button class="tbtn primary" onclick="saveAdminKey()">Save</button>
+          </div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-h"><h3>Endpoints</h3></div>
         <div class="card-b flush">
           <div class="acct-row"><span>Observatory</span><span>${OBS}</span></div>
           <div class="acct-row"><span>Bridge</span><span>${BRIDGE}</span></div>
-          <div class="acct-row"><span>Health poll interval</span><span>30s</span></div>
+          <div class="acct-row"><span>Identity</span><span>${IDENTITY_API}</span></div>
+          <div class="acct-row"><span>SSE /live</span><span>${BRIDGE}/live</span></div>
+          <div class="acct-row"><span>Health poll</span><span>30s · observatory backup 60s</span></div>
         </div>
       </div>
       <div class="card">
@@ -1724,7 +1791,7 @@ function renderSettings() {
           <div class="acct-row"><span>Vessels</span><span>${FLEET.length}</span></div>
           <div class="acct-row"><span>Relays</span><span>${CONNECTIONS.length}</span></div>
           <div class="acct-row"><span>Regions</span><span>${REGIONS.length}</span></div>
-          <div class="acct-row"><span>Build</span><span>v3.1 runbooks · 2026-06-28</span></div>
+          <div class="acct-row"><span>Build</span><span>v3.2 live debug · 2026-06-28</span></div>
           <div class="acct-row"><span>Runbooks</span><span>${Object.keys(RUNBOOKS).length} vessels</span></div>
           <div class="acct-row"><span>Relay updates</span><span>${Object.keys(RELAY_UPDATES).length} tracked</span></div>
         </div>
@@ -1738,6 +1805,27 @@ function renderSettings() {
           <div class="acct-row"><span>Grudge token</span><span>${state.grudgeToken ? 'linked' : '—'}</span></div>
           <div class="acct-row"><span>Identity API</span><span>${IDENTITY_API}</span></div>
           <div class="acct-row"><span>Game API proxy</span><span>${GRUDGE_API}</span></div>
+          <div class="acct-row"><span>SSE stream</span><span>${state.liveConnected ? 'connected' : 'reconnecting'}</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Observatory Sources</h3><span class="csub">requires admin key</span></div>
+        <div class="card-b flush">
+          ${!adminSet ? '<div class="empty"><p>Enter fleet admin key above to list ingest sources.</p></div>' :
+            !state.obsSources ? '<div class="empty"><p>Click Refresh debug.</p></div>' :
+            state.obsSources.map(s => typeof s === 'string' ? '' : `
+              <div class="acct-row"><span>${escapeHtml(s.source || s.error || '?')}</span>
+                <span>${s.last_seen ? fmtTime(s.last_seen) : escapeHtml(String(s.event_count ?? s.error ?? ''))}</span></div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Worker Code</h3><span class="csub">CF API via Bridge</span></div>
+        <div class="card-b flush">
+          ${!adminSet ? '<div class="empty"><p>Admin key required.</p></div>' :
+            !state.debugWorkers ? '<div class="empty"><p>Click Refresh debug.</p></div>' :
+            (Array.isArray(state.debugWorkers) ? state.debugWorkers : []).slice(0, 40).map(w => typeof w === 'string' ?
+              `<div class="acct-row"><span>${escapeHtml(w)}</span><span><button class="tbtn" onclick="previewWorker('${w.replace(/'/g,"\\'")}')">Preview</button></span></div>` : '').join('')}
+          ${state.debugWorkerPreview ? `<pre style="margin-top:12px;padding:12px;background:var(--abyss);font-size:10px;max-height:240px;overflow:auto;white-space:pre-wrap">${escapeHtml(state.debugWorkerPreview.preview || '…')}</pre>` : ''}
         </div>
       </div>
     </div>
@@ -1790,6 +1878,7 @@ window.setTab = setTab; window.askBridge = askBridge; window.selectVessel = sele
 window.closeInsp = closeInsp; window.lookupAccount = lookupAccount; window.loadDemoAccount = loadDemoAccount;
 window.mapZoom = mapZoom; window.mapCenter = mapCenter; window.pollHealth = pollHealth;
 window.startBridgeLiveStream = startBridgeLiveStream;
+window.saveAdminKey = saveAdminKey; window.loadDebugPanels = loadDebugPanels; window.previewWorker = previewWorker;
 
 /* ─────────────────────────────────────────────────────
    HOOKS + INIT
