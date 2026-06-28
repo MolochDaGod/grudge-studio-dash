@@ -720,6 +720,9 @@ const state = {
   bridgeMsgs: [{role:'system', text:'I am the Bridge — fleet ops co-pilot. Observatory tail + Grudge ID lookup are live. Ask about Colyseus on Windows VPS, Linux Docker 503s, observatory wiring, or click any relay for the recommended update.'}],
   logFilter: { level: null, source: null, text: '' },
   logFrozen: false,
+  liveConnected: false,
+  liveStreamAbort: null,
+  liveReconnectTimer: null,
   selectedAcct: null,
 };
 
@@ -778,7 +781,7 @@ async function signInWithPuter() {
     render();
     renderBridge();
     pollHealth();
-    pollObservatory();
+    startBridgeLiveStream();
     pollBridgeContext();
     loadIdentityStats();
   } catch (e) {
@@ -797,6 +800,7 @@ async function signOutPuter() {
   sessionStorage.removeItem('gs_puter_operator');
   sessionStorage.removeItem('gs_admin_key');
   sessionStorage.removeItem('gs_grudge_token');
+  stopBridgeLiveStream();
   showAuthGate();
 }
 
@@ -912,6 +916,78 @@ function pushEvent(evt) {
   if (state.events.length > 500) state.events.length = 500;
 }
 
+function ingestObservatoryEvent(evt, rerender) {
+  const before = state.events.length;
+  pushEvent({
+    id: evt.id,
+    ts: typeof evt.ts === 'number' ? evt.ts : Date.parse(evt.ts) || Date.now(),
+    level: evt.level || 'info',
+    source: evt.source || 'observatory',
+    message: evt.message || (evt.ai ? `AI ${evt.ai.provider}/${evt.ai.model} ${evt.ai.status}` : JSON.stringify(evt)),
+  });
+  if (rerender && state.events.length > before && state.tab === 'logs') render();
+}
+
+function parseSseBlock(block) {
+  let eventType = 'message';
+  let data = '';
+  for (const line of block.split('\n')) {
+    if (!line || line.startsWith(':')) continue;
+    if (line.startsWith('event:')) eventType = line.slice(6).trim();
+    else if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).trim();
+  }
+  if (eventType !== 'event' || !data) return;
+  try { ingestObservatoryEvent(JSON.parse(data), true); } catch {}
+}
+
+function stopBridgeLiveStream() {
+  if (state.liveReconnectTimer) {
+    clearTimeout(state.liveReconnectTimer);
+    state.liveReconnectTimer = null;
+  }
+  if (state.liveStreamAbort) {
+    state.liveStreamAbort.abort();
+    state.liveStreamAbort = null;
+  }
+  state.liveConnected = false;
+}
+
+async function startBridgeLiveStream() {
+  if (!state.puterUser) return;
+  stopBridgeLiveStream();
+  const ac = new AbortController();
+  state.liveStreamAbort = ac;
+  try {
+    const r = await fetch(`${BRIDGE}/live`, {
+      headers: operatorHeaders({ Accept: 'text/event-stream' }),
+      cache: 'no-store',
+      signal: ac.signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.body) throw new Error('No stream body');
+    state.liveConnected = true;
+    pushEvent({ ts: Date.now(), level: 'info', source: 'bridge-live', message: 'SSE stream connected' });
+    if (state.tab === 'logs') render();
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop() || '';
+      for (const block of parts) parseSseBlock(block);
+    }
+    throw new Error('stream ended');
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    state.liveConnected = false;
+    if (state.tab === 'logs') render();
+    state.liveReconnectTimer = setTimeout(() => startBridgeLiveStream(), 5000);
+  }
+}
+
 async function pollObservatory() {
   try {
     const r = await fetch(`${OBS}/v1/tail?limit=50`, { headers: operatorHeaders(), cache: 'no-store', signal: AbortSignal.timeout(8000) });
@@ -920,13 +996,7 @@ async function pollObservatory() {
     let added = 0;
     for (const evt of (d.events || [])) {
       const before = state.events.length;
-      pushEvent({
-        id: evt.id,
-        ts: typeof evt.ts === 'number' ? evt.ts : Date.parse(evt.ts) || Date.now(),
-        level: evt.level || 'info',
-        source: evt.source || 'observatory',
-        message: evt.message || (evt.ai ? `AI ${evt.ai.provider}/${evt.ai.model} ${evt.ai.status}` : JSON.stringify(evt)),
-      });
+      ingestObservatoryEvent(evt, false);
       if (state.events.length > before) added++;
     }
     if (added && state.tab === 'logs') render();
@@ -1473,10 +1543,11 @@ function renderLogs() {
   });
   return `
     <div class="ph">
-      <div><h2>Live Tail</h2><p>Health poll + <b>observatory /v1/tail</b> every 15s. ${state.events.length} buffered, ${filtered.length} matching filter.</p></div>
+      <div><h2>Live Tail</h2><p><span class="tbadge ${state.liveConnected?'ok':''}" style="display:inline-flex;margin-right:8px">${state.liveConnected ? '● Bridge SSE live' : '○ SSE reconnecting…'}</span> Health poll + <b>Bridge /live</b> stream + observatory tail backup (60s). ${state.events.length} buffered, ${filtered.length} matching.</p></div>
       <div class="ph-r">
         <button class="tbtn ${state.logFrozen?'primary':''}" onclick="state.logFrozen=!state.logFrozen;render()">${state.logFrozen?'▶ Resume':'⏸ Freeze'}</button>
-        <button class="tbtn" onclick="state.events=[];render()">🗑 Clear</button>
+        <button class="tbtn" onclick="state.events=[];state.eventIds.clear();render()">🗑 Clear</button>
+        <button class="tbtn" onclick="startBridgeLiveStream()">↻ Reconnect SSE</button>
       </div>
     </div>
     <div class="body">
@@ -1718,6 +1789,7 @@ function toggleBridge() {
 window.setTab = setTab; window.askBridge = askBridge; window.selectVessel = selectVessel;
 window.closeInsp = closeInsp; window.lookupAccount = lookupAccount; window.loadDemoAccount = loadDemoAccount;
 window.mapZoom = mapZoom; window.mapCenter = mapCenter; window.pollHealth = pollHealth;
+window.startBridgeLiveStream = startBridgeLiveStream;
 
 /* ─────────────────────────────────────────────────────
    HOOKS + INIT
@@ -1749,11 +1821,12 @@ initPuterAuth().then(async authed => {
   render();
   renderBridge();
   pollHealth();
+  startBridgeLiveStream();
   pollObservatory();
   pollBridgeContext();
   loadIdentityStats();
   setInterval(pollHealth, 30000);
-  setInterval(pollObservatory, 15000);
+  setInterval(pollObservatory, 60000);
   setInterval(pollBridgeContext, 60000);
 });
 </script>
