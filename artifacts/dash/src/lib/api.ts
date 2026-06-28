@@ -51,7 +51,7 @@ export interface HealthResult {
 }
 
 const HEALTH_PATHS: Partial<Record<ServiceKey, string>> = {
-  survival: "/api/health",
+  survival: "/api/healthz",
   "forge-api": "/api/healthz",
 };
 

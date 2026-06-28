@@ -1,7 +1,7 @@
 import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Users, Gamepad2, Swords, Fish, Joystick, Wrench,
-  Server, HardDrive, Database, ScrollText, Rocket,
+  Server, HardDrive, Database, ScrollText, Rocket, Train,
   Trophy, Layers, Monitor, TableProperties, Search, Coins,
   Settings2, BookOpen, LogOut, Crosshair, Flame,
 } from "lucide-react";
@@ -58,6 +58,7 @@ const NAV = [
     section: "Infrastructure",
     items: [
       { href: "/services", label: "Services", icon: Server },
+      { href: "/railway", label: "Railway Fleet", icon: Train },
       { href: "/deploy", label: "Deploy", icon: Rocket },
       { href: "/storage", label: "Object Storage", icon: HardDrive },
       { href: "/logs", label: "Logs", icon: ScrollText },

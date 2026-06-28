@@ -27,6 +27,7 @@ import Query from "./pages/Query";
 import Economy from "./pages/Economy";
 import ModeConfigs from "./pages/ModeConfigs";
 import Docs from "./pages/Docs";
+import Railway from "./pages/Railway";
 import Battle from "./pages/Battle";
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/tcg" component={TCG} />
           <Route path="/unity-servers" component={UnityServers} />
           <Route path="/services" component={Services} />
+          <Route path="/railway" component={Railway} />
           <Route path="/deploy" component={Deploy} />
           <Route path="/storage" component={Storage} />
           <Route path="/database" component={DatabasePage} />
