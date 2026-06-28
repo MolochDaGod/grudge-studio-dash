@@ -29,7 +29,10 @@ export interface FlagshipGame {
   label: string;
   short: string;
   icon: string;
+  /** Public entry / marketing URL */
   liveUrl: string;
+  /** Playable client (when different from liveUrl) */
+  playUrl?: string;
   dashPath: string;
   repo: string;
   description: string;
@@ -63,11 +66,13 @@ export const FLAGSHIP_GAMES: FlagshipGame[] = [
     id: "grudox",
     label: "Grudox",
     short: "Grudox",
-    icon: "🧟",
-    liveUrl: "https://grudges.grudge-studio.com/arpg-game/",
+    icon: "◈",
+    liveUrl: "https://grudox.grudge-studio.com",
+    playUrl: "https://grudox.grudge-studio.com/arpg-game/",
     dashPath: "/games/grudox",
     repo: "MolochDaGod/survival",
-    description: "Survival ARPG — characters, saves, encampment world",
+    description:
+      "Grudge Nexus era — low-poly voxel world, Quaternius characters, grudge-control locomotion, LED mask CNFT entry",
     apiBase: "survival",
   },
 ];
@@ -85,7 +90,7 @@ export const SERVICES: ServiceDef[] = [
   { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Authentication, JWT, OAuth" },
   { key: "api", name: "Game API", url: API.api, description: "api.grudge-studio.com — Characters, PvP, economy, crafting" },
   { key: "account", name: "Account API", url: API.account, description: "account.grudge-studio.com — Profiles, friends, achievements" },
-  { key: "survival", name: "Survival API", url: API.survival, description: "Grudox — accounts, characters, world saves (Railway)" },
+  { key: "survival", name: "Nexus API", url: API.survival, description: "Grudox / Grudge Nexus — accounts, characters, masks, world saves (Railway)" },
   { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher manifest" },
   { key: "ws", name: "WebSocket", url: `https://${API.ws.replace("wss://", "")}`, description: "ws.grudge-studio.com — Real-time PvP, island, crew events" },
   { key: "assets-api", name: "Asset Service", url: API.assetsApi, description: "assets-api.grudge-studio.com — Upload, metadata, conversions" },
