@@ -56,7 +56,7 @@ export default function Services() {
                   <p className="text-[0.6rem] uppercase text-muted-foreground">Endpoint</p>
                   <p className="text-sm font-semibold truncate">
                     {svc.url}
-                    {svc.key === "survival" ? "/api/health" : svc.key === "forge-api" ? "/api/healthz" : "/health"}
+                    {svc.key === "api" ? "/api/health" : svc.key === "survival" ? "/api/healthz" : svc.key === "forge-api" ? "/api/healthz" : svc.key === "colyseus" || svc.key === "game-servers" ? "/health" : "/health"}
                   </p>
                 </div>
                 <div>

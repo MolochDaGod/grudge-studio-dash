@@ -391,7 +391,10 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
   <div class="bridge-body">
     <div class="bridge-msgs" id="bridgeMsgs"></div>
     <div class="bridge-side">
-      <h5>Quick Asks</h5>
+      <h5>Mode</h5>
+      <button class="bchip" id="bridgeModeAgent" onclick="setBridgeMode('agent')">⚡ Agent</button>
+      <button class="bchip" id="bridgeModeChat" onclick="setBridgeMode('chat')">💬 Chat</button>
+      <h5 style="margin-top:10px">Quick Asks</h5>
       <div id="bridgeQuick"></div>
     </div>
   </div>
@@ -408,7 +411,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
 
 <script>
 /* ============================================================
-   FLEET DATA — 59 vessels (verified live + Command Console merge)
+   FLEET DATA — 72 vessels (verified 2026-07-02 · Railway SSOT + live games)
    ============================================================ */
 const REGIONS = [
   { id:'cloudflare', label:'CLOUDFLARE EDGE',  sub:'19 Workers · global',         x:30,   y:130,  w:1100, h:560, color:'#f97316' },
@@ -431,9 +434,19 @@ const FLEET = [
   {id:'grudge-dash',            name:'Harbor Command',   region:'production', icon:'📊', kind:'flagship', size:4, url:'dash.grudge-studio.com', healthUrl:'https://dash.grudge-studio.com', desc:'Fleet console · Puter operators only', stack:['Puter.js','Harbor Map','Vercel'], tags:['live','admin'], notes:'Puter login required (grudachain / molochdadev). Proxies API to grudge-fleet-harbor worker.'},
   {id:'grudge-id',              name:'Identity Hub',     region:'production', icon:'🔑', kind:'fortress', size:4, url:'id.grudge-studio.com',   healthUrl:'https://id.grudge-studio.com',   desc:'Grudge ID · Puter/OAuth', stack:['CF Worker','Railway'], tags:['live','auth']},
   {id:'grudge-ai',              name:'AI Legion Hub',    region:'production', icon:'🤖', kind:'fortress', size:4, url:'ai.grudge-studio.com',   healthUrl:'https://ai.grudge-studio.com',   desc:'ALE AI gateway', stack:['CF Worker','D1'], tags:['live','ai'], notes:'Observatory ingest pending — GameRoom DO migration blocks deploy.'},
-  {id:'grudge-fleet',           name:'Fleet Command',    region:'production', icon:'🗺️', kind:'flagship', size:4, url:'fleet.grudge-studio.com', healthUrl:'https://fleet.grudge-studio.com', desc:'Vercel proxy → harbor worker', stack:['Vercel rewrite','CF Worker'], tags:['live']},
-  {id:'grudge-fleet-harbor',    name:'Harbor Worker',    region:'cloudflare', icon:'⚓', kind:'fortress', size:4, url:'grudge-fleet-harbor.grudge.workers.dev', healthUrl:'https://grudge-fleet-harbor.grudge.workers.dev/health', desc:'Serves map + API bindings', stack:['Wrangler','Service bindings'], tags:['live','new']},
+  {id:'grudge-fleet',           name:'Fleet Command',    region:'production', icon:'🗺️', kind:'flagship', size:4, url:'fleet.grudge-studio.com', healthUrl:'https://fleet.grudge-studio.com', desc:'Harbor Map · Vercel → grudge-fleet-harbor worker', stack:['Vercel rewrite','CF Worker'], tags:['live']},
+  {id:'grudge-fleet-harbor',    name:'Harbor Worker',    region:'cloudflare', icon:'⚓', kind:'fortress', size:4, url:'grudge-fleet-harbor.grudge.workers.dev', healthUrl:'https://grudge-fleet-harbor.grudge.workers.dev/health', desc:'Serves map + Bridge + Observatory bindings', stack:['Wrangler','Service bindings'], tags:['live']},
   {id:'the-engine',             name:'The-ENGINE',       region:'vercel', icon:'🎮', kind:'flagship', size:5, url:'grudge-studio.com', healthUrl:'https://grudge-studio.com', desc:'Rec0deD portal + Railway API', stack:['Vite','Railway','Puter'], tags:['live','vercel']},
+  {id:'sub-client',             name:'client.grudge-studio', region:'production', icon:'🖥️', kind:'frigate', size:3, url:'client.grudge-studio.com', healthUrl:'https://client.grudge-studio.com', desc:'Warlords client mirror · baked anims · grudge-nexus assets', stack:['R2 mirror','Vercel proxy'], tags:['live','cdn']},
+  {id:'forge-editor',           name:'Grudge Studio Forge', region:'production', icon:'🗺️', kind:'flagship', size:4, url:'forge.grudge-studio.com', healthUrl:'https://forge.grudge-studio.com', desc:'Map/model editor — R3F+Rapier+ObjectStore', stack:['RTS-Grudge','Vercel'], tags:['live','editor']},
+  {id:'carrier-game',           name:'Carrier PvP',      region:'production', icon:'🚀', kind:'flagship', size:4, url:'carrier.grudge-studio.com', healthUrl:'https://carrier.grudge-studio.com', desc:'Fleet dogfight — co-located WS /api/carrier', stack:['GRUDOX','Railway room server'], tags:['live','pvp']},
+  {id:'grudox-hub',             name:'GRUDOX Hub',       region:'production', icon:'🕹️', kind:'flagship', size:4, url:'grudox.grudge-studio.com', healthUrl:'https://grudox.grudge-studio.com', desc:'Arcade cabinets · editors · deploy kit', stack:['Vercel','CF Worker'], tags:['live']},
+  {id:'warlord-genesis',        name:'Warlord Genesis',  region:'production', icon:'⚔️', kind:'flagship', size:4, url:'warlord-genesis.vercel.app', healthUrl:'https://warlord-genesis.vercel.app', desc:'Three-lane RTS · Railway player saves · client CDN assets', stack:['Vite bundle','Railway API','ObjectStore models'], tags:['live','new'], notes:'Flow: / → guest/Puter → /lobby → Deploy → /play. Assets via /api/assets → client.grudge-studio.com.'},
+  {id:'sub-play',               name:'play.grudge-studio', region:'production', icon:'🎮', kind:'frigate', size:3, url:'play.grudge-studio.com', healthUrl:'https://play.grudge-studio.com', desc:'Hero RTS + lobby routing (game-servers worker)', tags:['live']},
+  {id:'objectstore-prod',       name:'ObjectStore',      region:'production', icon:'📦', kind:'fortress', size:4, url:'objectstore.grudge-studio.com', healthUrl:'https://objectstore.grudge-studio.com/api/v1/weapons.json', desc:'JSON catalogs + asset registry (D1+R2)', stack:['CF Worker'], tags:['live']},
+  {id:'railway-game-data',      name:'Game Data SSOT',   region:'external', icon:'🚂', kind:'fortress', size:5, url:'grudge-api-production-0d46.up.railway.app', healthUrl:'https://grudge-api-production-0d46.up.railway.app/api/health', desc:'Postgres SSOT — characters, wallet, islands, inventory', stack:['Railway','Postgres','Colyseus'], tags:['live'], notes:'Proxied same-origin /api/characters|wallet|island|… on all Vercel games.'},
+  {id:'railway-warlord-genesis',name:'warlord-genesis-api',region:'external', icon:'🚂', kind:'frigate', size:3, url:'warlord-genesis-api-production.up.railway.app', healthUrl:'https://warlord-genesis-api-production.up.railway.app/api/health', desc:'Warlord Genesis player DB + grudge proxy', stack:['Railway','Postgres'], tags:['live']},
+  {id:'railway-grudox-server',  name:'GRUDOX Room Server',region:'external', icon:'🚂', kind:'frigate', size:4, url:'voxgrudge-grudox-room-production.up.railway.app', healthUrl:'https://voxgrudge-grudox-room-production.up.railway.app/health', desc:'Carrier/Space/Brawl authoritative rooms', stack:['Railway','Socket.IO'], tags:['live','pvp']},
 
   // Cloudflare workers
   {id:'grudge-auth-gateway',    name:'auth-gateway',      region:'cloudflare', icon:'🛡️', kind:'fortress', size:4, url:'auth.grudgestudio.com', healthUrl:'https://auth.grudgestudio.com/health', desc:'JWT validation', tags:['worker']},
@@ -444,9 +457,9 @@ const FLEET = [
   {id:'grudge-route-monitor',   name:'route-monitor',     region:'cloudflare', icon:'📡', kind:'lighthouse', size:2, url:'(worker)', healthUrl:null, desc:'Cron health monitor', tags:['worker','cron']},
   {id:'grudge-health-ping',     name:'health-ping',       region:'cloudflare', icon:'❤️', kind:'lighthouse', size:1, url:'(worker)', healthUrl:null, desc:'Heartbeat pings', tags:['worker','cron']},
   {id:'legion-monitor',         name:'legion-monitor',    region:'cloudflare', icon:'⚖️', kind:'lighthouse', size:2, url:'(worker)', healthUrl:null, desc:'Legion uptime', tags:['worker','cron']},
-  {id:'grudge-game-servers',    name:'game-servers',      region:'cloudflare', icon:'🎮', kind:'frigate', size:3, url:'(worker)', healthUrl:null, desc:'Matchmake + lobby routing', stack:['CF Worker','KV','GameLobby DO'], tags:['worker'], notes:'Set COLYSEUS_HOST=74.208.174.62 after Windows VPS deploy. GameLobby DO may cover lobbies without Colyseus — verify which path Warlords uses.'},
+  {id:'grudge-game-servers',    name:'game-servers',      region:'cloudflare', icon:'🎮', kind:'frigate', size:3, url:'grudge-game-servers.grudge.workers.dev', healthUrl:'https://grudge-game-servers.grudge.workers.dev/health', desc:'Matchmake + lobby routing → Colyseus VPS', stack:['CF Worker','KV','GameLobby DO'], tags:['worker','live'], notes:'COLYSEUS_HOST=74.208.174.62 · COLYSEUS_PORT=2567 (wrangler.toml). Edge DO for lobby WS; island sync via Windows Colyseus.'},
   {id:'grudge-observatory',     name:'observatory',       region:'cloudflare', icon:'🔭', kind:'fortress', size:4, url:'grudge-fleet-harbor.grudge.workers.dev/api/observatory', healthUrl:'https://grudge-fleet-harbor.grudge.workers.dev/api/observatory/health', desc:'Fleet logging API · D1', stack:['D1','Wrangler'], tags:['live','worker']},
-  {id:'grudge-ai-debugger',     name:'The Bridge',        region:'cloudflare', icon:'🧠', kind:'flagship', size:4, url:'grudge-fleet-harbor.grudge.workers.dev/api/bridge', healthUrl:'https://grudge-fleet-harbor.grudge.workers.dev/api/bridge/health', desc:'AI ops co-pilot', stack:['Anthropic','Observatory binding'], tags:['live','worker','ai'], notes:'Puter operator auth (grudachain/molochdadev). Anthropic key may need rotation.'},
+  {id:'grudge-ai-debugger',     name:'The Bridge',        region:'cloudflare', icon:'🧠', kind:'flagship', size:4, url:'grudge-fleet-harbor.grudge.workers.dev/api/bridge', healthUrl:'https://grudge-fleet-harbor.grudge.workers.dev/api/bridge/health', desc:'AI Fleet Administrator — dual agentic Claude', stack:['claude-sonnet-4-6','Navigator+Executor','GitHub','Agent-runner'], tags:['live','worker','ai'], notes:'Agent mode: plans + executes via GitHub API and Railway terminal runner.'},
   {id:'grudge-texture-ai',      name:'texture-ai',        region:'cloudflare', icon:'🎨', kind:'frigate', size:3, url:'(worker)', healthUrl:null, desc:'AI texture gen', tags:['worker','ai']},
   {id:'grudgeassets',           name:'grudgeassets',      region:'cloudflare', icon:'📦', kind:'sloop', size:2, url:'(worker)', healthUrl:null, desc:'Asset writer', tags:['worker']},
   {id:'prim-weather',           name:'prim-weather',      region:'cloudflare', icon:'⛅', kind:'sloop', size:1, url:'(worker)', healthUrl:null, desc:'Weather feed', tags:['worker']},
@@ -469,6 +482,10 @@ const FLEET = [
   {id:'d1-observatory',         name:'D1 observatory ✓',   region:'storage', icon:'🛢️', kind:'hulk', size:3, url:'d1://grudge-observatory', healthUrl:null, desc:'Logging history (live)', tags:['d1','new']},
 
   // Vercel
+  {id:'vc-rts-grudge',          name:'RTS-Grudge',         region:'vercel', icon:'⚔️', kind:'flagship', size:4, url:'rts-grudge.vercel.app', healthUrl:'https://rts-grudge.vercel.app', desc:'RTS client + Forge bundle host', tags:['vercel','live']},
+  {id:'vc-warlord-genesis',     name:'Warlord Genesis',    region:'vercel', icon:'🏰', kind:'flagship', size:4, url:'warlord-genesis.vercel.app', healthUrl:'https://warlord-genesis.vercel.app', desc:'Lane RTS — team grudgenexus', tags:['vercel','live','new']},
+  {id:'vc-survival',            name:'Grudges Survival',   region:'vercel', icon:'🌲', kind:'frigate', size:3, url:'grudges.grudge-studio.com', healthUrl:'https://grudges.grudge-studio.com', desc:'Open-world survival — survival-api Railway', tags:['vercel','live']},
+  {id:'vc-carrier-site',        name:'Carrier Site',       region:'vercel', icon:'🚀', kind:'frigate', size:3, url:'carrier-site.vercel.app', healthUrl:'https://carrier.grudge-studio.com', desc:'Carrier PvP shell', tags:['vercel','live']},
   {id:'gdevelop-assistant',     name:'GDevelop Assistant', region:'vercel', icon:'🎮', kind:'frigate', size:3, url:'gdevelop-assistant.vercel.app', healthUrl:'https://gdevelop-assistant.vercel.app', desc:'GrudgeDot launcher', tags:['vercel','puter']},
   {id:'dungeon-crawler',        name:'Dungeon Crawler',    region:'vercel', icon:'🏰', kind:'frigate', size:3, url:'dungeon-crawler-quest.vercel.app', healthUrl:'https://dungeon-crawler-quest.vercel.app', desc:'Voxel demo', tags:['vercel','threejs']},
   {id:'warlords-game',          name:'Warlords Game',      region:'vercel', icon:'🛡️', kind:'flagship', size:4, url:'grudge-warlords-game.vercel.app', healthUrl:'https://grudge-warlords-game.vercel.app', desc:'Combat + skills', tags:['vercel','game']},
@@ -476,10 +493,10 @@ const FLEET = [
 
   // Puter
   {id:'grudge-crafting',        name:'Grudge Crafting',    region:'puter', icon:'⚒️', kind:'frigate', size:3, url:'grudge-crafting.puter.site', healthUrl:'https://grudge-crafting.puter.site', desc:'Crafting suite', tags:['puter']},
-  {id:'object-store',           name:'Object Store',       region:'puter', icon:'📦', kind:'barge', size:2, url:'molochdagod.github.io/ObjectStore', healthUrl:'https://molochdagod.github.io/ObjectStore', desc:'Asset & item DB', tags:['github-pages']},
+  {id:'object-store',           name:'ObjectStore (legacy GH)', region:'puter', icon:'📦', kind:'barge', size:2, url:'molochdagod.github.io/ObjectStore', healthUrl:'https://objectstore.grudge-studio.com/api/v1/weapons.json', desc:'Redirect to objectstore.grudge-studio.com', tags:['deprecated']},
 
   // Backend Fortress (public subdomains)
-  {id:'grudge-backend',         name:'Grudge Backend',     region:'backend', icon:'🔧', kind:'fortress', size:4, url:'api.grudge-studio.com', healthUrl:'https://api.grudge-studio.com/health', desc:'Core API', tags:['vps','node'], notes:'Public face of the VPS Express stack. Down because the underlying Docker services are 503.'},
+  {id:'grudge-backend',         name:'api.grudge-studio (legacy)', region:'backend', icon:'🔧', kind:'fortress', size:4, url:'api.grudge-studio.com', healthUrl:'https://api.grudge-studio.com/health', desc:'DEPRECATED — old CF tunnel gateway', tags:['deprecated'], notes:'Use Railway game-data SSOT + id.grudge-studio.com auth. Vercel games proxy /api/characters → grudge-api-production.'},
   {id:'grudge-pvp',             name:'PvP Server',         region:'backend', icon:'⚡', kind:'frigate', size:3, url:'pvp.grudge-studio.com', healthUrl:null, desc:'Real-time PvP (WS)', tags:['vps','websocket']},
   {id:'grudge-openworld',       name:'Open World',         region:'backend', icon:'🌍', kind:'frigate', size:3, url:'world.grudge-studio.com', healthUrl:null, desc:'Zone server', tags:['vps','mmo']},
   {id:'grudge-db',              name:'Database',           region:'backend', icon:'🗄️', kind:'hulk', size:3, url:'db.grudge-studio.com', healthUrl:null, desc:'Player data', tags:['vps','database']},
@@ -496,9 +513,9 @@ const FLEET = [
   {id:'svc-coolify',            name:'Coolify',               region:'vps-linux', icon:'🛠️', kind:'lighthouse', size:2, url:':8000', healthUrl:null, desc:'Orchestrator', tags:['docker','infra']},
 
   // Windows VPS
-  {id:'vps-windows-host',       name:'Windows VPS',           region:'vps-windows', icon:'🖥️', kind:'fortress', size:4, url:'74.208.174.62', healthUrl:null, desc:'GRUDGEYONKO · game servers', stack:['Windows','PM2','Node 20'], tags:['vps','pending'], notes:'RDP target for Colyseus. Not auth/API — game rooms only.'},
-  {id:'colyseus',               name:'Colyseus Server',       region:'vps-windows', icon:'🏟️', kind:'frigate', size:4, url:'74.208.174.62:2567', healthUrl:null, desc:'Authoritative multiplayer rooms', stack:['Colyseus','Node.js','PM2'], tags:['game','pending','down']},
-  {id:'colyseus-rooms',         name:'Game Rooms',            region:'vps-windows', icon:'🎯', kind:'sloop', size:2, url:'ws://74.208.174.62:2567', healthUrl:null, desc:'Per-island room instances', stack:['Colyseus Schema'], tags:['game','pending','down']},
+  {id:'vps-windows-host',       name:'Windows VPS',           region:'vps-windows', icon:'🖥️', kind:'fortress', size:4, url:'74.208.174.62', healthUrl:'http://74.208.174.62:2567/health', desc:'GRUDGEYONKO · Colyseus game rooms (PM2)', stack:['Windows','PM2','Node 20'], tags:['vps','live'], notes:'RDP 74.208.174.62 · game.grudge-studio.com DNS · TCP 2567 open. Not auth/API.'},
+  {id:'colyseus',               name:'Colyseus Server',       region:'vps-windows', icon:'🏟️', kind:'frigate', size:4, url:'74.208.174.62:2567', healthUrl:'http://74.208.174.62:2567/health', desc:'Authoritative multiplayer rooms (grudge-colyseus)', stack:['Colyseus','Node.js','PM2'], tags:['game','live'], notes:'Monitor: /colyseus · Playground: /colyseus-playground · 7 room types from GrudgeBuilder/server/colyseus'},
+  {id:'colyseus-rooms',         name:'Game Rooms',            region:'vps-windows', icon:'🎯', kind:'sloop', size:2, url:'ws://74.208.174.62:2567', healthUrl:'http://74.208.174.62:2567/colyseus', desc:'Per-island room instances', stack:['Colyseus Schema'], tags:['game','live']},
 
   // External
   {id:'ext-anthropic',          name:'Anthropic API',         region:'external', icon:'🧠', kind:'lighthouse', size:2, url:'api.anthropic.com', healthUrl:null, desc:'Claude — powers Bridge', tags:['ai']},
@@ -520,9 +537,7 @@ const FLEET = [
 
   // ─── Discovered via worker source code (CORS allowlists + route-monitor SERVICES) ───
   {id:'be-account-api',     name:'Account API',          region:'backend', icon:'👤', kind:'frigate', size:3, url:'account.grudge-studio.com', healthUrl:'https://account.grudge-studio.com/health', desc:'Account API (route-monitor polls)', tags:['vps','discovered']},
-  {id:'sub-play',           name:'play.grudge-studio',   region:'production', icon:'🎮', kind:'frigate', size:3, url:'play.grudge-studio.com', healthUrl:'https://play.grudge-studio.com', desc:'Lobby WS routing target (game-servers)', tags:['frontend','discovered']},
   {id:'sub-nexus',          name:'nexus.grudge-studio',  region:'production', icon:'🌌', kind:'sloop', size:2, url:'nexus.grudge-studio.com', healthUrl:'https://nexus.grudge-studio.com', desc:'Nexus subdomain', tags:['frontend','discovered']},
-  {id:'sub-client',         name:'client.grudge-studio', region:'production', icon:'🖥️', kind:'sloop', size:2, url:'client.grudge-studio.com', healthUrl:'https://client.grudge-studio.com', desc:'Client launcher', tags:['frontend','discovered']},
   {id:'sub-game',           name:'game.grudge-studio',   region:'production', icon:'⚔️', kind:'sloop', size:2, url:'game.grudge-studio.com', healthUrl:'https://game.grudge-studio.com', desc:'Game subdomain', tags:['frontend','discovered']},
   {id:'vc-grudge-engine',   name:'Grudge Engine Web',    region:'vercel', icon:'⚙️', kind:'frigate', size:3, url:'grudge-engine-web.vercel.app', healthUrl:'https://grudge-engine-web.vercel.app', desc:'Engine editor (route-monitor polls)', tags:['vercel','discovered']},
   {id:'vc-warlord-crafting',name:'Warlord Crafting',     region:'vercel', icon:'⚒️', kind:'frigate', size:3, url:'warlord-crafting-suite.vercel.app', healthUrl:'https://warlord-crafting-suite.vercel.app', desc:'Crafting Suite UI', tags:['vercel','discovered']},
@@ -537,32 +552,32 @@ const FLEET = [
 ];
 
 const RUNBOOKS = {
-  colyseus: `Colyseus on Windows VPS (74.208.174.62):
+  colyseus: `Colyseus on Windows VPS (74.208.174.62) — LIVE 2026-07-03:
+
+Package path (confirmed): MolochDaGod/Grudge-Builder → server/ (not packages/api).
+Colyseus mounts in server/index.ts via setupColyseus(); standalone VPS build uses PORT=2567.
 
 1. RDP 74.208.174.62
-2. Install Node 20 LTS + PM2: npm i -g pm2
-3. Clone/build Colyseus server from @grudge/api in the Turborepo
-   (packages/api or survival monorepo — confirm package path before clone)
-4. npm run build && pm2 start dist/index.js --name colyseus
+2. Node 20 LTS + PM2: npm i -g pm2
+3. git clone Grudge-Builder → cd Grudge-Builder && npm ci
+4. npm run build && set PORT=2567 && pm2 start dist/index.js --name colyseus
 5. pm2 startup && pm2 save
-6. Windows Firewall: allow TCP 2567 (Colyseus) + matchmake port
-7. wrangler secret/var on grudge-game-servers: COLYSEUS_HOST=74.208.174.62
-8. Open Grudge Warlords → rooms count should tick up on join
+6. Windows Firewall: allow TCP 2567 (Colyseus WebSocket + HTTP)
+7. grudge-game-servers wrangler.toml: COLYSEUS_HOST=74.208.174.62 COLYSEUS_PORT=2567
+8. grudgewarlords.com → join island → room count ticks on /colyseus monitor
 
-Verify: curl http://74.208.174.62:2567/health (or Colyseus monitor endpoint)`,
+Verify: curl http://74.208.174.62:2567/health
+Smoke: curl http://74.208.174.62:2567/colyseus`,
 
-  'grudge-game-servers': `game-servers worker wiring:
+  'grudge-game-servers': `game-servers worker wiring — LIVE:
 
-CURRENT: Matchmake + GameLobby Durable Object on Cloudflare edge.
-TARGET: Route real-time island sync to Colyseus on Windows VPS.
+Edge: Matchmake + GameLobby DO on api.grudge-studio.com/lobby/*
+Colyseus: COLYSEUS_HOST=74.208.174.62 COLYSEUS_PORT=2567 in wrangler.toml [vars]
+GAME_API_URL → Railway grudge-api-production (Postgres SSOT)
 
-1. Deploy Colyseus (see colyseus runbook)
-2. In grudge-game-servers wrangler.toml [vars]:
-   COLYSEUS_HOST = "74.208.174.62"
-   COLYSEUS_PORT = "2567"
-3. wrangler deploy grudge-game-servers
-4. Test: grudgewarlords.com → create/join room → WS hits 74.208.174.62
-5. Wire observatory ingest (OBSERVATORY_KEY) so matchmake errors surface in /admin/sources`,
+Deploy: cd grudge-fleet/game-servers && npx wrangler deploy
+Smoke: curl https://grudge-game-servers.grudge.workers.dev/health
+Test: grudgewarlords.com → create/join → colyseusHost in lobby JSON`,
 
   'grudge-dash': `Harbor Command (dash.grudge-studio.com):
 
@@ -617,15 +632,45 @@ Auth: x-puter-operator header (grudachain | molochdadev).
 Fallback: observatory snapshot when Anthropic 401.
 
 Rotate ANTHROPIC_API_KEY if chat returns fallback-only responses.
-Deploy: cd grudge-fleet/ai-debugger && wrangler deploy`,
+Deploy: cd grudge-fleet/bridge && wrangler deploy`,
+
+  'warlord-genesis': `Warlord Genesis deploy (warlord-genesis.vercel.app):
+
+1. Repo: github.com/MolochDaGod/warlord-genesis
+2. predeploy: stage-assets → fix-glb-header → patch-bundle → generate-vercel-config
+3. /api/assets/* → client.grudge-studio.com (baked anims + Color_Palette)
+4. /models/kaykit|grudge6|… → objectstore.grudge-studio.com
+5. /api/auth/puter + /api/characters → Railway grudge-api SSOT
+6. Game flow: / → guest/Puter → /lobby → Deploy → /play (direct /play bounces to lobby)
+7. git push main → Vercel auto-deploy (bundle ?v= cache bust in patch-bundle.mjs)`,
+
+  'carrier-game': `Carrier live PvP (carrier.grudge-studio.com):
+
+Pattern: co-located WebSocket on Railway room server — no separate socket cluster.
+1. Client: carrier.grudge-studio.com (Vercel)
+2. Server: voxgrudge-grudox-room-production.up.railway.app
+3. WS path: wss://…/api/carrier (CF Worker may proxy on grudox worker)
+4. Smoke: open Carrier → create room → tick counter advances`,
+
+  'railway-game-data': `Railway Postgres SSOT (grudge-api-production):
+
+Canonical game state for ALL fleet games. Vercel vercel.json must list Railway prefixes
+BEFORE /api/auth and /api/:path* catch-alls.
+SSOT code: GrudgeBuilder/shared/fleet/manifest.ts
+Verify: node scripts/verify-fleet-truth.mjs`,
 };
 
 const RELAY_UPDATES = {
-  'grudge-warlords→colyseus': 'BLOCKED until Colyseus deploy. Priority #1 for multiplayer.',
-  'grudge-game-servers→colyseus': 'Set COLYSEUS_HOST after step 7 of Colyseus runbook.',
+  'grudge-warlords→colyseus': 'LIVE — WS island sync via 74.208.174.62:2567 (verify client colyseusEndpoint).',
+  'grudge-game-servers→colyseus': 'LIVE — COLYSEUS_HOST=74.208.174.62 deployed on grudge-game-servers worker.',
   'grudge-warlords→grudge-game-servers': 'ACTIVE — verify GameLobby DO handles your lobby flow.',
   'grudge-ai-debugger→grudge-observatory': 'LIVE via service binding — wire more workers to ingest.',
   'grudge-dash→grudge-fleet-harbor': 'LIVE — dash Vercel serves HTML; API via workers.dev cross-origin.',
+  'grudge-fleet→grudge-fleet-harbor': 'FIXED 2026-07-02 — Vercel host rewrite proxies to harbor worker (was 404 admin-harbor.html).',
+  'warlord-genesis→sub-client': 'LIVE — /api/assets baked anims + grudge-nexus textures via client.grudge-studio.com.',
+  'warlord-genesis→railway-game-data': 'LIVE — /api/auth/puter + player saves via Railway SSOT.',
+  'warlord-genesis→objectstore-prod': 'LIVE — KayKit/GRUDGE6 models via /models/* ObjectStore rewrites.',
+  'carrier-game→railway-grudox-server': 'LIVE — authoritative Carrier rooms on Railway.',
   'grudge-auth-gateway→svc-grudge-id': 'BROKEN — edge auth live but Docker origin down. Use Neon + Railway path.',
   'colyseus→svc-game-api': 'After Colyseus live: persist room state to game-api every 30s (unverified).',
   'grudge-observatory→d1-observatory': 'LIVE — expand INGEST_KEYS for all workers.',
@@ -634,7 +679,18 @@ const RELAY_UPDATES = {
 const CONNECTIONS = [
   // ── LIVE: Fleet console + observability stack ──
   {from:'grudge-dash', to:'grudge-fleet-harbor', status:'active', label:'HTML + API proxy'},
-  {from:'grudge-fleet', to:'grudge-fleet-harbor', status:'active', label:'Vercel rewrite'},
+  {from:'grudge-fleet', to:'grudge-fleet-harbor', status:'active', label:'Vercel → harbor worker'},
+  {from:'warlord-genesis', to:'sub-client', status:'active', label:'/api/assets CDN'},
+  {from:'warlord-genesis', to:'railway-game-data', status:'active', label:'auth + saves'},
+  {from:'warlord-genesis', to:'objectstore-prod', status:'active', label:'models proxy'},
+  {from:'warlord-genesis', to:'railway-warlord-genesis', status:'active', label:'player DB'},
+  {from:'grudge-warlords', to:'railway-game-data', status:'active', label:'Postgres SSOT'},
+  {from:'grudge-warlords', to:'objectstore-prod', status:'active', label:'JSON catalogs'},
+  {from:'grudge-warlords', to:'sub-client', status:'active', label:'client mirror'},
+  {from:'forge-editor', to:'objectstore-prod', status:'active', label:'ObjectStore CDN'},
+  {from:'carrier-game', to:'railway-grudox-server', status:'active', label:'WS rooms'},
+  {from:'grudox-hub', to:'railway-grudox-server', status:'active', label:'game server'},
+  {from:'vc-rts-grudge', to:'forge-editor', status:'active', label:'/forge bundle'},
   {from:'grudge-fleet-harbor', to:'grudge-observatory', status:'active', label:'service binding'},
   {from:'grudge-fleet-harbor', to:'grudge-ai-debugger', status:'active', label:'service binding'},
   {from:'grudge-ai-debugger', to:'grudge-observatory', status:'active', label:'context+tail'},
@@ -662,15 +718,15 @@ const CONNECTIONS = [
   {from:'grudge-objectstore-api', to:'d1-objectstore', status:'active', label:'metadata'},
   {from:'grudge-vercel-proxy', to:'grudge-warlords', status:'active'},
 
-  // ── MULTIPLAYER: edge lobbies live, Colyseus pending ──
+  // ── MULTIPLAYER: edge lobbies + Colyseus VPS live ──
   {from:'grudge-warlords', to:'grudge-game-servers', status:'active', label:'matchmake'},
   {from:'grudge-game-servers', to:'do-game-lobby', status:'active', label:'WS lobbies'},
   {from:'sub-play', to:'grudge-game-servers', status:'active', label:'lobby route'},
-  {from:'grudge-game-servers', to:'colyseus', status:'broken', label:'COLYSEUS_HOST unset'},
-  {from:'grudge-warlords', to:'colyseus', status:'broken', label:'WS island sync'},
-  {from:'vps-windows-host', to:'colyseus', status:'broken', label:'PM2 not started'},
-  {from:'colyseus', to:'colyseus-rooms', status:'broken', label:'no process'},
-  {from:'colyseus', to:'svc-game-api', status:'unverified', label:'persist 30s'},
+  {from:'grudge-game-servers', to:'colyseus', status:'active', label:'COLYSEUS_HOST'},
+  {from:'grudge-warlords', to:'colyseus', status:'active', label:'WS island sync'},
+  {from:'vps-windows-host', to:'colyseus', status:'active', label:'PM2 colyseus'},
+  {from:'colyseus', to:'colyseus-rooms', status:'active', label:'room instances'},
+  {from:'colyseus', to:'railway-game-data', status:'unverified', label:'persist state'},
 
   // ── BROKEN: Linux VPS Docker stack ──
   {from:'grudge-backend', to:'svc-game-api', status:'broken', label:'503'},
@@ -718,7 +774,8 @@ const state = {
   puterUser: null, grudgeToken: null, grudgeUser: null,
   bridgeContext: null, identityStats: null,
   acctLoading: false, acctSource: null,
-  bridgeMsgs: [{role:'system', text:'I am the Bridge — fleet ops co-pilot. Observatory tail + Grudge ID lookup are live. Ask about Colyseus on Windows VPS, Linux Docker 503s, observatory wiring, or click any relay for the recommended update.'}],
+  bridgeMode: 'agent',
+  bridgeMsgs: [{role:'system', text:'I am The Bridge — AI Fleet Administrator. Dual agentic Claude: Navigator plans, Executor runs GitHub + terminal tools to fix grudge-studio systems. Agent mode is ON by default.'}],
   logFilter: { level: null, source: null, text: '' },
   logFrozen: false,
   liveConnected: false,
@@ -827,10 +884,14 @@ async function initPuterAuth() {
   showAuthGate();
   return false;
 }
-// dash.grudge-studio.com DNS skips /api/* to Vercel — call harbor worker directly.
+// dash.grudge-studio.com: Vercel has no /api/* → call harbor worker cross-origin.
+// fleet.grudge-studio.com: Vercel proxies all paths to harbor worker (same-origin /api/*).
 const API_ROOT = location.hostname === 'dash.grudge-studio.com'
-  ? 'https://grudge-fleet-harbor.grudge.workers.dev' : '';
-const GRUDGE_API = location.hostname === 'dash.grudge-studio.com' ? '/api' : 'https://api.grudge-studio.com/api';
+  ? 'https://grudge-fleet-harbor.grudge.workers.dev'
+  : (location.hostname === 'grudge-fleet-harbor.grudge.workers.dev' ? '' : '');
+const GRUDGE_API = (location.hostname === 'dash.grudge-studio.com' || location.hostname === 'fleet.grudge-studio.com')
+  ? 'https://grudge-api-production-0d46.up.railway.app/api'
+  : 'https://grudge-api-production-0d46.up.railway.app/api';
 const OBS = `${API_ROOT}/api/observatory`;
 const BRIDGE = `${API_ROOT}/api/bridge`;
 const IDENTITY_API = `${API_ROOT}/api/identity`;
@@ -1035,6 +1096,22 @@ async function loadIdentityStats() {
 }
 
 /* ────────── BRIDGE CHAT ────────── */
+function formatAgentReply(d) {
+  let reply = d.response || d.summary || d.error || '(empty response)';
+  if (d.mode === 'agent' && d.agents) {
+    const steps = d.agents.tool_calls || d.agents.executor?.steps || [];
+    const tools = steps.filter(s => s.tool).map(s => `• ${s.tool}: ${(s.output || '').slice(0, 120)}…`);
+    if (tools.length) reply += '\n\n**Tool runs:**\n' + tools.join('\n');
+    if (d.agents.navigator?.text) reply = `**Navigator:** ${d.agents.navigator.text.slice(0, 800)}\n\n**Executor:** ${reply}`;
+  }
+  return reply;
+}
+
+function setBridgeMode(mode) {
+  state.bridgeMode = mode;
+  renderBridge();
+}
+
 async function bridgeChat(question) {
   state.bridgeMsgs.push({role:'user', text: question});
   state.bridgeBusy = true;
@@ -1045,16 +1122,19 @@ async function bridgeChat(question) {
     const r = await fetch(`${BRIDGE}/chat`, {
       method:'POST',
       headers: operatorHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ messages: state.bridgeMsgs.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.text })) }),
+      body: JSON.stringify({
+        mode: state.bridgeMode || 'agent',
+        messages: state.bridgeMsgs.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.text })),
+      }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
-    reply = d.response || d.error || '(empty response)';
+    reply = formatAgentReply(d);
     if (d.fallback) {
       usedFallback = true;
-      reply += '\n\n_(Bridge fallback — rotate ANTHROPIC_API_KEY on grudge-ai-debugger for live Claude)_';
+      reply += '\n\n_(Bridge fallback — check ANTHROPIC_API_KEY on grudge-ai-debugger)_';
     }
-    pushEvent({ ts: Date.now(), level: usedFallback ? 'warn' : 'info', source: 'grudge-ai-debugger', message: `bridge chat ${usedFallback ? '(fallback)' : 'ok'}` });
+    pushEvent({ ts: Date.now(), level: usedFallback ? 'warn' : 'info', source: 'grudge-ai-debugger', message: `bridge ${d.mode || 'chat'} ${usedFallback ? '(fallback)' : 'ok'}` });
   } catch (e) {
     usedFallback = true;
     reply = localBridgeReply(question) + `\n\n_(Network error: ${e.message || 'offline'} — using local runbooks)_`;
@@ -1843,12 +1923,14 @@ function renderBridge() {
   }).join('');
   $('bridgeMsgs').innerHTML = msgs;
   $('bridgeMsgs').scrollTop = $('bridgeMsgs').scrollHeight;
+  $('bridgeModeAgent')?.classList.toggle('active', state.bridgeMode === 'agent');
+  $('bridgeModeChat')?.classList.toggle('active', state.bridgeMode === 'chat');
   $('bridgeQuick').innerHTML = [
-    'My next 3 highest-impact actions',
-    'Why are 5 services down?',
-    'Wire ai-hub into observatory',
-    'Audit candidates to retire',
-    'Deploy Colyseus on Windows VPS',
+    'Fix api.grudge-studio.com and verify metadata',
+    'Deploy bridge-agent-runner on Railway',
+    'Wire observatory on all workers',
+    'Audit broken relays and fix top 3',
+    'Update grudge-backend on Railway',
   ].map(q => `<button class="bchip" onclick="askBridge('${q.replace(/'/g, "\\'")}')">${q}</button>`).join('');
   $('bridgeInput').disabled = state.bridgeBusy;
   $('bridgeSend').disabled = state.bridgeBusy;
@@ -1874,7 +1956,7 @@ function toggleBridge() {
   $('bridgeToggleBtn').textContent = state.bridgeOpen ? '▼' : '▲';
 }
 
-window.setTab = setTab; window.askBridge = askBridge; window.selectVessel = selectVessel;
+window.setTab = setTab; window.askBridge = askBridge; window.setBridgeMode = setBridgeMode; window.selectVessel = selectVessel;
 window.closeInsp = closeInsp; window.lookupAccount = lookupAccount; window.loadDemoAccount = loadDemoAccount;
 window.mapZoom = mapZoom; window.mapCenter = mapCenter; window.pollHealth = pollHealth;
 window.startBridgeLiveStream = startBridgeLiveStream;

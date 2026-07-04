@@ -1,10 +1,17 @@
+/** Railway Postgres SSOT — canonical game API (replaces dead api.grudge-studio.com tunnel). */
+export const GAME_API_BASE =
+  import.meta.env.VITE_API_URL || "https://grudge-api-production-0d46.up.railway.app";
+
 export const API = {
   auth: import.meta.env.VITE_AUTH_URL || "https://id.grudge-studio.com",
-  api: import.meta.env.VITE_API_URL || "https://api.grudge-studio.com",
+  api: GAME_API_BASE,
   account: import.meta.env.VITE_ACCOUNT_URL || "https://account.grudge-studio.com",
   survival: import.meta.env.VITE_SURVIVAL_API_URL || "https://survival-api-production.up.railway.app",
   launcher: import.meta.env.VITE_LAUNCHER_URL || "https://launcher.grudge-studio.com",
   ws: import.meta.env.VITE_WS_URL || "wss://ws.grudge-studio.com",
+  colyseus: import.meta.env.VITE_COLYSEUS_URL || "http://74.208.174.62:2567",
+  gameServers:
+    import.meta.env.VITE_GAME_SERVERS_URL || "https://grudge-game-servers.grudge.workers.dev",
   assetsApi: "https://assets-api.grudge-studio.com",
   assetsCdn: "https://assets.grudge-studio.com",
 } as const;
@@ -77,7 +84,17 @@ export const FLAGSHIP_GAMES: FlagshipGame[] = [
   },
 ];
 
-export type ServiceKey = "auth" | "api" | "account" | "survival" | "launcher" | "ws" | "assets-api" | "forge-api";
+export type ServiceKey =
+  | "auth"
+  | "api"
+  | "account"
+  | "survival"
+  | "launcher"
+  | "ws"
+  | "colyseus"
+  | "game-servers"
+  | "assets-api"
+  | "forge-api";
 
 export interface ServiceDef {
   key: ServiceKey;
@@ -88,11 +105,13 @@ export interface ServiceDef {
 
 export const SERVICES: ServiceDef[] = [
   { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Authentication, JWT, OAuth" },
-  { key: "api", name: "Game API", url: API.api, description: "api.grudge-studio.com — Characters, PvP, economy, crafting" },
+  { key: "api", name: "Game API", url: API.api, description: "Railway grudge-api — Characters, PvP, economy, crafting (Postgres SSOT)" },
   { key: "account", name: "Account API", url: API.account, description: "account.grudge-studio.com — Profiles, friends, achievements" },
   { key: "survival", name: "Nexus API", url: API.survival, description: "Grudox / Grudge Nexus — accounts, characters, masks, world saves (Railway)" },
   { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher manifest" },
   { key: "ws", name: "WebSocket", url: `https://${API.ws.replace("wss://", "")}`, description: "ws.grudge-studio.com — Real-time PvP, island, crew events" },
+  { key: "colyseus", name: "Colyseus (Windows VPS)", url: API.colyseus, description: "74.208.174.62:2567 — Authoritative multiplayer rooms (PM2)" },
+  { key: "game-servers", name: "Game Servers Worker", url: API.gameServers, description: "Edge matchmake + GameLobby DO → Colyseus VPS" },
   { key: "assets-api", name: "Asset Service", url: API.assetsApi, description: "assets-api.grudge-studio.com — Upload, metadata, conversions" },
   { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "forge-api.grudge-studio.com — Scene editor backend, AI worker, R2 storage, navmesh" },
 ];
@@ -138,11 +157,11 @@ export const GRUDGE_APPS: GrudgeApp[] = [
   {
     id: "grudge-platform",
     name: "Grudge Platform",
-    description: "Core Gruda game platform & login",
-    category: "game",
-    liveUrl: "https://www.grudgeplatform.com/login",
+    description: "Web3 hub — wallets, cNFTs, Grudge ID SSO",
+    category: "web3",
+    liveUrl: "https://apps.grudge-studio.com",
     repo: "MolochDaGod/grudge-platform",
-    icon: "⚔️",
+    icon: "⛓️",
     embeddable: false,
     backend: ["api", "auth", "account"],
   },

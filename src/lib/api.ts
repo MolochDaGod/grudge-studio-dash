@@ -51,7 +51,10 @@ export interface HealthResult {
 }
 
 const HEALTH_PATHS: Partial<Record<ServiceKey, string>> = {
+  api: "/api/health",
   survival: "/api/healthz",
+  colyseus: "/health",
+  "game-servers": "/health",
   "forge-api": "/api/healthz",
 };
 

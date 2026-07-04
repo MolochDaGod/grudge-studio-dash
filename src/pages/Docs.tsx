@@ -2,11 +2,13 @@ import TopBar from "../components/TopBar";
 
 const VPS_IP = "74.208.155.229";
 const VPS2_IP = "74.208.174.62";
+const COLYSEUS_PORT = 2567;
+const RAILWAY_GAME_API = "https://grudge-api-production-0d46.up.railway.app";
 
 const VPS_SERVICES = [
   { name: "grudge-id", port: 3001, domain: "id.grudge-studio.com", desc: "Auth, JWT, OAuth, Puter bridge" },
   { name: "wallet-service", port: 3002, domain: null, desc: "Solana wallets (internal)" },
-  { name: "game-api", port: 3003, domain: "api.grudge-studio.com", desc: "Characters, PvP, economy, crafting, admin" },
+  { name: "game-api (legacy Docker)", port: 3003, domain: "api.grudge-studio.com", desc: "DEPRECATED — use Railway grudge-api SSOT" },
   { name: "ai-agent", port: 3004, domain: null, desc: "LLM missions, companion, lore (internal)" },
   { name: "account-api", port: 3005, domain: "account.grudge-studio.com", desc: "Profiles, friends, achievements" },
   { name: "launcher-api", port: 3006, domain: "launcher.grudge-studio.com", desc: "Game launcher manifest" },
@@ -18,17 +20,23 @@ const VPS_SERVICES = [
   { name: "Uptime Kuma", port: 3001, domain: "status.grudge-studio.com", desc: "Health monitoring dashboard" },
 ];
 
+const VPS2_SERVICES = [
+  { name: "colyseus (PM2)", port: COLYSEUS_PORT, domain: `game.grudge-studio.com → ${VPS2_IP}`, desc: "Authoritative multiplayer — GrudgeBuilder/server/colyseus (7 room types)" },
+  { name: "Colyseus monitor", port: COLYSEUS_PORT, domain: null, desc: "HTTP /colyseus · playground /colyseus-playground" },
+];
+
 const CF_WORKERS = [
   { name: "grudge-studio-site", domain: "grudge-studio.com", desc: "Main marketing site" },
   { name: "grudge-r2-cdn", domain: "assets.grudge-studio.com", desc: "R2 CDN — game assets" },
+  { name: "grudge-game-servers", domain: "api.grudge-studio.com/lobby/*", desc: "Edge matchmake + GameLobby DO → Colyseus VPS" },
   { name: "grudge-health-ping", domain: "workers.dev", desc: "Cron health pings every 5m" },
 ];
 
 const DNS_RECORDS = [
   { sub: "(root)", target: "CF Worker", proxied: true },
   { sub: "dash", target: "Vercel (76.76.21.21)", proxied: false },
-  { sub: "id", target: `VPS1 (${VPS_IP})`, proxied: true },
-  { sub: "api", target: `VPS1 (${VPS_IP})`, proxied: true },
+  { sub: "id", target: "Vercel (Grudge ID)", proxied: true },
+  { sub: "api", target: "CF Worker game-servers + Railway SSOT", proxied: true },
   { sub: "account", target: `VPS1 (${VPS_IP})`, proxied: true },
   { sub: "launcher", target: `VPS1 (${VPS_IP})`, proxied: true },
   { sub: "ws", target: `VPS1 (${VPS_IP})`, proxied: true },
@@ -98,6 +106,38 @@ export default function Docs() {
         </div>
       </section>
 
+      {/* Windows VPS Colyseus */}
+      <section className="mb-8">
+        <h2 className="text-lg mb-3">VPS2 Colyseus ({VPS2_IP})</h2>
+        <div className="inset-panel overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Service</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Port</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Domain</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {VPS2_SERVICES.map((s) => (
+                <tr key={s.name} className="border-b border-border/50">
+                  <td className="px-3 py-1.5 font-medium">{s.name}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">:{s.port}</td>
+                  <td className="px-3 py-1.5">{s.domain ? <code className="text-primary text-xs">{s.domain}</code> : <span className="text-muted-foreground text-xs">internal</span>}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground text-xs">{s.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Smoke: <code className="text-primary">curl http://{VPS2_IP}:{COLYSEUS_PORT}/health</code>
+          {" · "}
+          Worker: <code className="text-primary">COLYSEUS_HOST={VPS2_IP}</code> on grudge-game-servers
+        </p>
+      </section>
+
       {/* CF Workers */}
       <section className="mb-8">
         <h2 className="text-lg mb-3">Cloudflare Workers</h2>
@@ -126,7 +166,7 @@ export default function Docs() {
       {/* API Reference */}
       <section className="mb-8">
         <h2 className="text-lg mb-3">Game API Route Namespaces</h2>
-        <p className="text-xs text-muted-foreground mb-3">Base: <code className="text-primary">https://api.grudge-studio.com</code></p>
+        <p className="text-xs text-muted-foreground mb-3">Base: <code className="text-primary">{RAILWAY_GAME_API}</code></p>
         <div className="inset-panel overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
