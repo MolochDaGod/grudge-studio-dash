@@ -1,11 +1,11 @@
 export const API = {
   auth: import.meta.env.VITE_AUTH_URL || "https://id.grudge-studio.com",
   api: import.meta.env.VITE_API_URL || "https://api.grudge-studio.com",
-  account: import.meta.env.VITE_ACCOUNT_URL || "https://account.grudge-studio.com",
+  account: import.meta.env.VITE_ACCOUNT_URL || "https://api.grudge-studio.com",
   survival: import.meta.env.VITE_SURVIVAL_API_URL || "https://survival-api-production.up.railway.app",
   launcher: import.meta.env.VITE_LAUNCHER_URL || "https://launcher.grudge-studio.com",
   ws: import.meta.env.VITE_WS_URL || "wss://ws.grudge-studio.com",
-  assetsApi: "https://assets-api.grudge-studio.com",
+  assetsApi: "https://objectstore.grudge-studio.com",
   assetsCdn: "https://assets.grudge-studio.com",
 } as const;
 
@@ -84,11 +84,11 @@ export interface ServiceDef {
 export const SERVICES: ServiceDef[] = [
   { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Authentication, JWT, OAuth" },
   { key: "api", name: "Game API", url: API.api, description: "api.grudge-studio.com — Characters, PvP, economy, crafting" },
-  { key: "account", name: "Account API", url: API.account, description: "account.grudge-studio.com — Profiles, friends, achievements" },
+  { key: "account", name: "Account API", url: API.account, description: "api.grudge-studio.com — Profiles, friends, achievements (grudge-backend)" },
   { key: "survival", name: "Survival API", url: API.survival, description: "Grudox — accounts, characters, world saves (Railway)" },
   { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher manifest" },
   { key: "ws", name: "WebSocket", url: `https://${API.ws.replace("wss://", "")}`, description: "ws.grudge-studio.com — Real-time PvP, island, crew events" },
-  { key: "assets-api", name: "Asset Service", url: API.assetsApi, description: "assets-api.grudge-studio.com — Upload, metadata, conversions" },
+  { key: "assets-api", name: "ObjectStore API", url: API.assetsApi, description: "objectstore.grudge-studio.com — Catalog JSON, upload, metadata" },
   { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "forge-api.grudge-studio.com — Scene editor backend, AI worker, R2 storage, navmesh" },
 ];
 
@@ -256,11 +256,11 @@ export const GRUDGE_APPS: GrudgeApp[] = [
   },
   {
     id: "grudge-backend",
-    name: "Grudge Studio Backend",
-    description: "VPS backend — Grudge ID, wallet, game API, Nginx, CI/CD",
+    name: "Grudge Backend (unified API)",
+    description: "Auth gateway + unified API — id.grudge-studio.com, api.grudge-studio.com",
     category: "infra",
-    liveUrl: "",
-    repo: "MolochDaGod/grudge-studio-backend",
+    liveUrl: "https://id.grudge-studio.com",
+    repo: "MolochDaGod/grudge-backend",
     icon: "🖥️",
     embeddable: false,
     backend: ["api", "auth", "account", "ws", "minio"],
