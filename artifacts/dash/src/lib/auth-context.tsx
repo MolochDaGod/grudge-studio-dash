@@ -48,30 +48,62 @@ const FLEET_TOKEN_KEYS = [
 const ADMIN_ROLES = new Set(["admin", "master", "owner", "master_admin", "master-admin"]);
 
 function saveSession(user: AdminUser) {
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  // Prefer localStorage so session survives tab close (90d fleet policy)
   try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     localStorage.setItem("grudge_auth_token", user.token);
+    localStorage.setItem("grudge_session_token", user.token);
+    localStorage.setItem("grudge.token", user.token);
+    localStorage.setItem("sso_token", user.token);
     localStorage.setItem("grudge_id", user.grudgeId);
     if (user.username) localStorage.setItem("grudge_username", user.username);
+    // JS cookie mirror for same-site fleet hosts
+    const maxAge = 90 * 24 * 60 * 60;
+    document.cookie = `grudge_auth_token=${encodeURIComponent(user.token)}; path=/; max-age=${maxAge}; SameSite=Lax; Secure; Domain=.grudge-studio.com`;
   } catch {
     /* ignore quota / private mode */
+  }
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    /* ignore */
   }
 }
 
 function loadSession(): AdminUser | null {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
   } catch {
-    return null;
+    /* fall through */
   }
+  // Fleet keys from another studio app on this browser
+  try {
+    const token =
+      localStorage.getItem("grudge_auth_token") ||
+      localStorage.getItem("grudge_session_token") ||
+      localStorage.getItem("grudge.token") ||
+      localStorage.getItem("sso_token");
+    if (token) {
+      return {
+        token,
+        grudgeId: localStorage.getItem("grudge_id") || "",
+        username: localStorage.getItem("grudge_username") || "Admin",
+        role: "player",
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 function clearSession() {
   sessionStorage.removeItem(STORAGE_KEY);
   try {
+    localStorage.removeItem(STORAGE_KEY);
     for (const k of FLEET_TOKEN_KEYS) localStorage.removeItem(k);
+    document.cookie = "grudge_auth_token=; path=/; max-age=0; Domain=.grudge-studio.com";
   } catch {
     /* ignore */
   }
@@ -81,10 +113,36 @@ function buildCallbackUrl(): string {
   return `${window.location.origin}/auth/callback`;
 }
 
-/** Canonical login: id.grudge-studio.com/login?redirect_uri=<dash>/auth/callback */
+/**
+ * Prefer silent SSO: if already signed in on id (studio cookie), skip the form.
+ * Falls back to login page when no session.
+ */
 export function buildDashLoginUrl(): string {
   const callback = buildCallbackUrl();
-  return `${ID_BASE}/login?redirect_uri=${encodeURIComponent(callback)}&app=dash`;
+  return `${ID_BASE}/auth/sso-check?return=${encodeURIComponent(callback)}`;
+}
+
+/** Silent claim: studio-wide cookie → long JWT without navigation. */
+async function claimFleetSession(): Promise<string | null> {
+  const urls = [`${ID_BASE}/api/auth/session/claim`, `${window.location.origin}/api/auth/session/claim`];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: "{}",
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const t = data.token || data.sessionToken;
+      if (t) return t as string;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
 }
 
 function takeTokenFromUrl(): string | null {
@@ -219,7 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 2) Restore prior session
+        // 2) Restore prior session (localStorage / fleet keys)
         const saved = loadSession();
         if (saved?.token) {
           try {
@@ -231,6 +289,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch {
             clearSession();
           }
+        }
+
+        // 3) Silent fleet claim — already signed in on id.grudge-studio.com
+        const claimed = await claimFleetSession();
+        if (claimed) {
+          const admin = await establishAdminSession(claimed);
+          if (cancelled) return;
+          saveSession(admin);
+          setUser(admin);
+          return;
         }
       } catch (e: any) {
         if (!cancelled) {
