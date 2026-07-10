@@ -58,7 +58,7 @@ function saveSession(user: AdminUser) {
     localStorage.setItem("grudge_id", user.grudgeId);
     if (user.username) localStorage.setItem("grudge_username", user.username);
     // JS cookie mirror for same-site fleet hosts
-    const maxAge = 90 * 24 * 60 * 60;
+    const maxAge = 365 * 24 * 60 * 60;
     document.cookie = `grudge_auth_token=${encodeURIComponent(user.token)}; path=/; max-age=${maxAge}; SameSite=Lax; Secure; Domain=.grudge-studio.com`;
   } catch {
     /* ignore quota / private mode */
