@@ -192,11 +192,11 @@ const GAPS = [
   },
   {
     id: "dead-api-tunnel",
-    severity: "high",
-    title: "api.grudge-studio.com is dead",
+    severity: "low",
+    title: "api.grudge-studio.com is dead (fixed on dash)",
     detail:
-      "Accounts page and old skill text still point at VPS tunnel. All game state → Railway. Dash rewrites already use Railway.",
-    action: "Replace remaining admin calls with GAME_API_BASE",
+      "Dash admin + Accounts now use GAME_API_BASE (Railway). Do not reintroduce the VPS tunnel.",
+    action: "Keep vercel.json rewrites → Railway only",
   },
   {
     id: "puter-cache",

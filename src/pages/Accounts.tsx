@@ -126,7 +126,7 @@ export default function Accounts() {
         {accounts.isLoading && <p className="text-muted-foreground text-sm">Loading accounts…</p>}
         {accounts.isError && (
           <div className="inset-panel p-4 text-sm text-danger">
-            Failed to load accounts — sign in with an admin token; endpoint is api.grudge-studio.com/api/admin/users
+            Failed to load accounts — sign in with an admin token; endpoint is Railway /api/admin/users
           </div>
         )}
         {users.length > 0 && (

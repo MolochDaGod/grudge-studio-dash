@@ -8,7 +8,7 @@ const RAILWAY_GAME_API = "https://grudge-api-production-0d46.up.railway.app";
 const VPS_SERVICES = [
   { name: "grudge-id", port: 3001, domain: "id.grudge-studio.com", desc: "Auth, JWT, OAuth, Puter bridge" },
   { name: "wallet-service", port: 3002, domain: null, desc: "Solana wallets (internal)" },
-  { name: "game-api (legacy Docker)", port: 3003, domain: "api.grudge-studio.com", desc: "DEPRECATED — use Railway grudge-api SSOT" },
+  { name: "game-api (legacy Docker)", port: 3003, domain: "api.grudge-studio.com", desc: "DEAD — use Railway grudge-api-production SSOT" },
   { name: "ai-agent", port: 3004, domain: null, desc: "LLM missions, companion, lore (internal)" },
   { name: "account-api (retired)", port: 3005, domain: null, desc: "RETIRED — profiles on grudge-backend (api.grudge-studio.com)" },
   { name: "launcher-api", port: 3006, domain: "launcher.grudge-studio.com", desc: "Game launcher manifest" },

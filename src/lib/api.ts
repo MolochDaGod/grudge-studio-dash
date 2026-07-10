@@ -110,7 +110,7 @@ export async function checkDeployment(url: string): Promise<DeployStatus> {
 }
 
 // ════════════════════════════════════════════════════════════════
-// GAME API — api.grudge-studio.com
+// GAME API — Railway grudge-api (GAME_API_BASE) — NOT api.grudge-studio.com
 // ════════════════════════════════════════════════════════════════
 
 export interface AdminStats {
@@ -272,7 +272,7 @@ export const economyApi = {
 // IDENTITY ADMIN — id.grudge-studio.com/admin (correct service owner)
 // ════════════════════════════════════════════════════════════════
 
-// User management — api.grudge-studio.com/api/admin/* (grudge-backend VPS)
+// User management — Railway /api/admin/* (same GAME_API_BASE as characters)
 export const accountApi = {
   list: (q?: string, page = 1, limit = 50) =>
     fetcher<{ success: boolean; users: AdminUserRow[]; pagination: { total: number; page: number; limit: number } }>(
@@ -333,7 +333,7 @@ export const accountApi = {
 };
 
 // ════════════════════════════════════════════════════════════════
-// ADMIN API — api.grudge-studio.com/admin/*
+// ADMIN API — Railway /api/admin/* (GAME_API_BASE)
 // ════════════════════════════════════════════════════════════════
 
 export const adminApi = {

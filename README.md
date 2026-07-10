@@ -46,7 +46,8 @@
 - **Logs** — Container log viewer
 
 ## API
-All API calls route through `api.grudge-studio.com`.
+All game/admin API calls use **Railway** `grudge-api-production` (`VITE_API_URL` / same-origin `/api/*` rewrites).  
+**Do not** use dead `api.grudge-studio.com`. Auth: `id.grudge-studio.com`. Assets CDN: `assets.grudge-studio.com`.
 
 ## Development
 ```bash
