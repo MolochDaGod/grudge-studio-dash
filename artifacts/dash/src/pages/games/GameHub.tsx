@@ -226,6 +226,37 @@ export default function GameHub({ game }: GameHubProps) {
         </section>
       )}
 
+      {game.id === "grudox" && (
+        <section className="fantasy-panel p-5 mb-6">
+          <h2 className="text-lg mb-2">Grudge Nexus Era</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Grudox is the public entry to Survival — a low-poly / voxel-forward Nexus world map with
+            Quaternius animated characters, grudge-control third-person locomotion, and Grudge ID saves.
+            LED mask CNFT sales and mask AI live on the landing; the ARPG client is the playable build.
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            <a
+              href={game.liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="gilded-button inline-block px-4 py-2 text-xs"
+            >
+              Entry · LED Masks →
+            </a>
+            {game.playUrl && (
+              <a
+                href={game.playUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block px-4 py-2 text-xs rounded border border-primary text-primary hover:bg-primary/10"
+              >
+                Play Nexus →
+              </a>
+            )}
+          </div>
+        </section>
+      )}
+
       {game.id === "grudox" && engineManifest.data && (
         <section className="fantasy-panel p-5 mb-6">
           <h2 className="text-lg mb-2">Nexus Engine Manifest</h2>

@@ -1,10 +1,19 @@
+/** Railway Postgres SSOT — canonical game API (replaces dead api.grudge-studio.com tunnel). */
+export const GAME_API_BASE =
+  import.meta.env.VITE_API_URL || "https://grudge-api-production-0d46.up.railway.app";
+
 export const API = {
   auth: import.meta.env.VITE_AUTH_URL || "https://id.grudge-studio.com",
-  api: import.meta.env.VITE_API_URL || "https://api.grudge-studio.com",
-  account: import.meta.env.VITE_ACCOUNT_URL || "https://api.grudge-studio.com",
+  api: GAME_API_BASE,
+  /** Account/profile — same Railway game API (not deprecated api.grudge-studio.com) */
+  account: import.meta.env.VITE_ACCOUNT_URL || GAME_API_BASE,
   survival: import.meta.env.VITE_SURVIVAL_API_URL || "https://survival-api-production.up.railway.app",
   launcher: import.meta.env.VITE_LAUNCHER_URL || "https://launcher.grudge-studio.com",
-  ws: import.meta.env.VITE_WS_URL || "wss://ws.grudge-studio.com",
+  ai: import.meta.env.VITE_AI_URL || "https://ai.grudge-studio.com",
+  ws: import.meta.env.VITE_WS_URL || "wss://grudge-api-production-0d46.up.railway.app",
+  colyseus: import.meta.env.VITE_COLYSEUS_URL || "https://grudge-api-production-0d46.up.railway.app",
+  gameServers:
+    import.meta.env.VITE_GAME_SERVERS_URL || "https://grudge-game-servers.grudge.workers.dev",
   assetsApi: "https://objectstore.grudge-studio.com",
   assetsCdn: "https://assets.grudge-studio.com",
 } as const;
@@ -29,7 +38,10 @@ export interface FlagshipGame {
   label: string;
   short: string;
   icon: string;
+  /** Public entry / marketing URL */
   liveUrl: string;
+  /** Playable client (when different from liveUrl) */
+  playUrl?: string;
   dashPath: string;
   repo: string;
   description: string;
@@ -63,16 +75,30 @@ export const FLAGSHIP_GAMES: FlagshipGame[] = [
     id: "grudox",
     label: "Grudox",
     short: "Grudox",
-    icon: "🧟",
-    liveUrl: "https://grudges.grudge-studio.com/arpg-game/",
+    icon: "◈",
+    liveUrl: "https://grudox.grudge-studio.com",
+    playUrl: "https://grudox.grudge-studio.com/arpg-game/",
     dashPath: "/games/grudox",
     repo: "MolochDaGod/survival",
-    description: "Survival ARPG — characters, saves, encampment world",
+    description:
+      "Grudge Nexus era — low-poly voxel world, Quaternius characters, grudge-control locomotion, LED mask CNFT entry",
     apiBase: "survival",
   },
 ];
 
-export type ServiceKey = "auth" | "api" | "account" | "survival" | "launcher" | "ws" | "assets-api" | "forge-api";
+export type ServiceKey =
+  | "auth"
+  | "api"
+  | "account"
+  | "survival"
+  | "launcher"
+  | "ai"
+  | "ws"
+  | "colyseus"
+  | "game-servers"
+  | "assets-api"
+  | "assets-cdn"
+  | "forge-api";
 
 export interface ServiceDef {
   key: ServiceKey;
@@ -82,14 +108,18 @@ export interface ServiceDef {
 }
 
 export const SERVICES: ServiceDef[] = [
-  { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Authentication, JWT, OAuth" },
-  { key: "api", name: "Game API", url: API.api, description: "api.grudge-studio.com — Characters, PvP, economy, crafting" },
-  { key: "account", name: "Account API", url: API.account, description: "api.grudge-studio.com — Profiles, friends, achievements (grudge-backend)" },
-  { key: "survival", name: "Survival API", url: API.survival, description: "Grudox — accounts, characters, world saves (Railway)" },
-  { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher manifest" },
-  { key: "ws", name: "WebSocket", url: `https://${API.ws.replace("wss://", "")}`, description: "ws.grudge-studio.com — Real-time PvP, island, crew events" },
-  { key: "assets-api", name: "ObjectStore API", url: API.assetsApi, description: "objectstore.grudge-studio.com — Catalog JSON, upload, metadata" },
-  { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "forge-api.grudge-studio.com — Scene editor backend, AI worker, R2 storage, navmesh" },
+  { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Login, JWT, OAuth, brand logo" },
+  { key: "api", name: "Game API (Railway)", url: API.api, description: "Postgres SSOT — characters, islands, wallet, inventory, economy" },
+  { key: "account", name: "Account (Railway)", url: API.account, description: "Same Railway origin — /api/account/* profiles & bag" },
+  { key: "survival", name: "Nexus API", url: API.survival, description: "Grudox / Nexus era — accounts, masks, world saves" },
+  { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher" },
+  { key: "ai", name: "AI Hub", url: API.ai, description: "ai.grudge-studio.com — Legion agents, Gemini BYOK" },
+  { key: "ws", name: "Realtime (Railway WS)", url: API.ws.replace("wss://", "https://"), description: "Colyseus / fleet realtime on grudge-api" },
+  { key: "colyseus", name: "Colyseus", url: API.colyseus, description: "Authoritative multiplayer rooms (Railway)" },
+  { key: "game-servers", name: "Game Servers Worker", url: API.gameServers, description: "Edge matchmake + lobby routing" },
+  { key: "assets-api", name: "ObjectStore", url: API.assetsApi, description: "Catalog JSON, upload, metadata (D1 + R2)" },
+  { key: "assets-cdn", name: "Assets CDN", url: API.assetsCdn, description: "assets.grudge-studio.com — icons, models, audio (R2)" },
+  { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "Scene editor backend, AI, R2, navmesh" },
 ];
 
 export type AppCategory = "game" | "editor" | "tool" | "infra" | "web3";
@@ -133,11 +163,11 @@ export const GRUDGE_APPS: GrudgeApp[] = [
   {
     id: "grudge-platform",
     name: "Grudge Platform",
-    description: "Core Gruda game platform & login",
-    category: "game",
-    liveUrl: "https://www.grudgeplatform.com/login",
+    description: "Web3 hub — wallets, cNFTs, Grudge ID SSO",
+    category: "web3",
+    liveUrl: "https://apps.grudge-studio.com",
     repo: "MolochDaGod/grudge-platform",
-    icon: "⚔️",
+    icon: "⛓️",
     embeddable: false,
     backend: ["api", "auth", "account"],
   },

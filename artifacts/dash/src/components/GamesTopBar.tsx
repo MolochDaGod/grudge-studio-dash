@@ -45,11 +45,11 @@ export default function GamesTopBar() {
                   <span>{game.label}</span>
                 </Link>
                 <a
-                  href={game.liveUrl}
+                  href={game.playUrl ?? game.liveUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="p-1 text-muted-foreground hover:text-primary"
-                  title={`Play ${game.label}`}
+                  title={game.playUrl ? `Play ${game.label}` : `Open ${game.label}`}
                 >
                   <ExternalLink size={12} />
                 </a>
