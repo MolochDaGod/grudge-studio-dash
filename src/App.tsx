@@ -39,6 +39,8 @@ export default function App() {
       <main className="ml-56 pt-14 p-6">
         <Switch>
           <Route path="/" component={Overview} />
+          {/* Canonical Grudge ID return path — AuthProvider picks up ?grudge_token= */}
+          <Route path="/auth/callback" component={Overview} />
           <Route path="/settings" component={Settings} />
           <Route path="/accounts" component={Accounts} />
           <Route path="/games/warlords" component={Warlords} />
