@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Gamepad2, Swords, Fish, Joystick, Wrench,
   Server, HardDrive, Database, ScrollText, Rocket, Train,
   Trophy, Layers, Monitor, TableProperties, Search, Coins,
-  Settings2, BookOpen, LogOut, Crosshair, Flame,
+  Settings2, BookOpen, LogOut, Crosshair, Flame, Settings,
 } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 
@@ -12,6 +12,7 @@ const NAV = [
     section: "Overview",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/settings", label: "Settings", icon: Settings },
       { href: "/accounts", label: "Accounts", icon: Users },
     ],
   },
@@ -80,9 +81,21 @@ export default function Sidebar() {
     <aside className="fantasy-panel fixed left-0 top-12 bottom-0 w-56 flex flex-col z-50 overflow-y-auto">
       {/* Logo */}
       <div className="p-4 border-b border-border">
-        <a href="https://grudge-studio.com" className="block" target="_self" rel="noopener noreferrer">
-          <h2 className="text-lg gold-text font-bold tracking-wider">Grudge Studio</h2>
-          <p className="text-[0.65rem] text-muted-foreground uppercase tracking-widest mt-0.5">Dashboard</p>
+        <a href="https://grudge-studio.com" className="flex items-center gap-2.5" target="_self" rel="noopener noreferrer">
+          <img
+            src="/grudge-id-logo.png"
+            alt=""
+            width={36}
+            height={36}
+            className="w-9 h-9 rounded-full object-cover ring-1 ring-primary/40 shrink-0"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://id.grudge-studio.com/grudge-id-logo.png";
+            }}
+          />
+          <div>
+            <h2 className="text-base gold-text font-bold tracking-wider leading-tight">Grudge Studio</h2>
+            <p className="text-[0.6rem] text-muted-foreground uppercase tracking-widest mt-0.5">Dashboard</p>
+          </div>
         </a>
       </div>
 

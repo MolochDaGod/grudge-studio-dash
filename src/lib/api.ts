@@ -50,23 +50,42 @@ export interface HealthResult {
   error?: string;
 }
 
-const HEALTH_PATHS: Partial<Record<ServiceKey, string>> = {
+const HEALTH_PATHS: Partial<Record<ServiceKey, string | null>> = {
+  auth: "/login",
   api: "/api/health",
+  account: "/api/health",
   survival: "/api/healthz",
-  colyseus: "/health",
+  launcher: "/",
+  ai: "/health",
+  colyseus: "/api/health",
   "game-servers": "/health",
+  "assets-api": "/health",
+  "assets-cdn": "/js/grudge-fleet.js",
   "forge-api": "/api/healthz",
+  ws: "/api/health",
 };
 
 export async function checkHealth(key: ServiceKey): Promise<HealthResult> {
   const svc = SERVICES.find((s) => s.key === key)!;
-  const healthPath = HEALTH_PATHS[key] ?? "/health";
+  const healthPath = HEALTH_PATHS[key];
   const start = performance.now();
+  if (healthPath === null) {
+    return { key, name: svc.name, url: svc.url, ok: true, ms: 0 };
+  }
   try {
-    const r = await fetch(`${svc.url}${healthPath}`, { method: "GET", signal: AbortSignal.timeout(8000) });
+    const path = healthPath ?? "/health";
+    const url = path.startsWith("http") ? path : `${svc.url.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+    const r = await fetch(url, { method: "GET", signal: AbortSignal.timeout(8000) });
     let body: any = {};
     try { body = await r.json(); } catch {}
-    return { key, name: svc.name, url: svc.url, ok: r.ok, ms: Math.round(performance.now() - start), version: body?.version };
+    return {
+      key,
+      name: svc.name,
+      url: svc.url,
+      ok: r.ok || (r.status >= 200 && r.status < 400),
+      ms: Math.round(performance.now() - start),
+      version: body?.version || body?.service,
+    };
   } catch (e) {
     return { key, name: svc.name, url: svc.url, ok: false, ms: Math.round(performance.now() - start), error: String(e) };
   }

@@ -5,11 +5,13 @@ export const GAME_API_BASE =
 export const API = {
   auth: import.meta.env.VITE_AUTH_URL || "https://id.grudge-studio.com",
   api: GAME_API_BASE,
-  account: import.meta.env.VITE_ACCOUNT_URL || "https://api.grudge-studio.com",
+  /** Account/profile — same Railway game API (not deprecated api.grudge-studio.com) */
+  account: import.meta.env.VITE_ACCOUNT_URL || GAME_API_BASE,
   survival: import.meta.env.VITE_SURVIVAL_API_URL || "https://survival-api-production.up.railway.app",
   launcher: import.meta.env.VITE_LAUNCHER_URL || "https://launcher.grudge-studio.com",
-  ws: import.meta.env.VITE_WS_URL || "wss://ws.grudge-studio.com",
-  colyseus: import.meta.env.VITE_COLYSEUS_URL || "http://74.208.174.62:2567",
+  ai: import.meta.env.VITE_AI_URL || "https://ai.grudge-studio.com",
+  ws: import.meta.env.VITE_WS_URL || "wss://grudge-api-production-0d46.up.railway.app",
+  colyseus: import.meta.env.VITE_COLYSEUS_URL || "https://grudge-api-production-0d46.up.railway.app",
   gameServers:
     import.meta.env.VITE_GAME_SERVERS_URL || "https://grudge-game-servers.grudge.workers.dev",
   assetsApi: "https://objectstore.grudge-studio.com",
@@ -90,10 +92,12 @@ export type ServiceKey =
   | "account"
   | "survival"
   | "launcher"
+  | "ai"
   | "ws"
   | "colyseus"
   | "game-servers"
   | "assets-api"
+  | "assets-cdn"
   | "forge-api";
 
 export interface ServiceDef {
@@ -104,16 +108,18 @@ export interface ServiceDef {
 }
 
 export const SERVICES: ServiceDef[] = [
-  { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Authentication, JWT, OAuth" },
-  { key: "api", name: "Game API", url: API.api, description: "Railway grudge-api — Characters, PvP, economy, crafting (Postgres SSOT)" },
-  { key: "account", name: "Account API", url: API.account, description: "api.grudge-studio.com — Profiles, friends, achievements (grudge-backend)" },
-  { key: "survival", name: "Nexus API", url: API.survival, description: "Grudox / Grudge Nexus — accounts, characters, masks, world saves (Railway)" },
-  { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher manifest" },
-  { key: "ws", name: "WebSocket", url: `https://${API.ws.replace("wss://", "")}`, description: "ws.grudge-studio.com — Real-time PvP, island, crew events" },
-  { key: "colyseus", name: "Colyseus (Windows VPS)", url: API.colyseus, description: "74.208.174.62:2567 — Authoritative multiplayer rooms (PM2)" },
-  { key: "game-servers", name: "Game Servers Worker", url: API.gameServers, description: "Edge matchmake + GameLobby DO → Colyseus VPS" },
-  { key: "assets-api", name: "ObjectStore API", url: API.assetsApi, description: "objectstore.grudge-studio.com — Catalog JSON, upload, metadata" },
-  { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "forge-api.grudge-studio.com — Scene editor backend, AI worker, R2 storage, navmesh" },
+  { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Login, JWT, OAuth, brand logo" },
+  { key: "api", name: "Game API (Railway)", url: API.api, description: "Postgres SSOT — characters, islands, wallet, inventory, economy" },
+  { key: "account", name: "Account (Railway)", url: API.account, description: "Same Railway origin — /api/account/* profiles & bag" },
+  { key: "survival", name: "Nexus API", url: API.survival, description: "Grudox / Nexus era — accounts, masks, world saves" },
+  { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher" },
+  { key: "ai", name: "AI Hub", url: API.ai, description: "ai.grudge-studio.com — Legion agents, Gemini BYOK" },
+  { key: "ws", name: "Realtime (Railway WS)", url: API.ws.replace("wss://", "https://"), description: "Colyseus / fleet realtime on grudge-api" },
+  { key: "colyseus", name: "Colyseus", url: API.colyseus, description: "Authoritative multiplayer rooms (Railway)" },
+  { key: "game-servers", name: "Game Servers Worker", url: API.gameServers, description: "Edge matchmake + lobby routing" },
+  { key: "assets-api", name: "ObjectStore", url: API.assetsApi, description: "Catalog JSON, upload, metadata (D1 + R2)" },
+  { key: "assets-cdn", name: "Assets CDN", url: API.assetsCdn, description: "assets.grudge-studio.com — icons, models, audio (R2)" },
+  { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "Scene editor backend, AI, R2, navmesh" },
 ];
 
 export type AppCategory = "game" | "editor" | "tool" | "infra" | "web3";
