@@ -8,7 +8,7 @@ const RAILWAY_GAME_API = "https://grudge-api-production-0d46.up.railway.app";
 const VPS_SERVICES = [
   { name: "grudge-id", port: 3001, domain: "id.grudge-studio.com", desc: "Auth, JWT, OAuth, Puter bridge" },
   { name: "wallet-service", port: 3002, domain: null, desc: "Solana wallets (internal)" },
-  { name: "game-api (legacy Docker)", port: 3003, domain: "api.grudge-studio.com", desc: "DEPRECATED — use Railway grudge-api SSOT" },
+  { name: "game-api (legacy Docker)", port: 3003, domain: "api.grudge-studio.com", desc: "DEAD — use Railway grudge-api-production SSOT" },
   { name: "ai-agent", port: 3004, domain: null, desc: "LLM missions, companion, lore (internal)" },
   { name: "account-api (retired)", port: 3005, domain: null, desc: "RETIRED — profiles on grudge-backend (api.grudge-studio.com)" },
   { name: "launcher-api", port: 3006, domain: "launcher.grudge-studio.com", desc: "Game launcher manifest" },
@@ -27,9 +27,50 @@ const VPS2_SERVICES = [
 
 const CF_WORKERS = [
   { name: "grudge-studio-site", domain: "grudge-studio.com", desc: "Main marketing site" },
-  { name: "grudge-r2-cdn", domain: "assets.grudge-studio.com", desc: "R2 CDN — game assets" },
+  { name: "grudge-r2-cdn", domain: "assets.grudge-studio.com", desc: "R2 CDN — game assets (binaries)" },
+  { name: "asset-api / registry", domain: "api.grudge-studio.com/assets", desc: "D1 asset_registry list (index only — not game SSOT)" },
   { name: "grudge-game-servers", domain: "api.grudge-studio.com/lobby/*", desc: "Edge matchmake + GameLobby DO → Colyseus VPS" },
   { name: "grudge-health-ping", domain: "workers.dev", desc: "Cron health pings every 5m" },
+];
+
+/** Dash routes for assets — keep in sync with App.tsx */
+const DASH_ASSET_PAGES = [
+  {
+    path: "/asset-browser",
+    alias: "/warlords-assets",
+    name: "Warlords Asset Catalog",
+    desc: "Browse full D1 asset_registry (~6k). Search, category/format/source filters, CDN open/copy.",
+  },
+  {
+    path: "/assets",
+    alias: null,
+    name: "Assets & SSOT",
+    desc: "Topology: Railway · ObjectStore · R2 · D1 registry · Puter crafting (what lives where).",
+  },
+  {
+    path: "/storage",
+    alias: null,
+    name: "Object Storage",
+    desc: "R2 bucket notes — binaries at assets.grudge-studio.com.",
+  },
+];
+
+const ASSET_API_ENDPOINTS = [
+  {
+    method: "GET",
+    url: "https://api.grudge-studio.com/assets?limit=100&offset=0",
+    desc: "Paginated registry rows (id, grudgeUuid, name, category, r2Key, cdnUrl, format, sourceSet, fileSize)",
+  },
+  {
+    method: "GET",
+    url: "https://assets.grudge-studio.com/{r2Key}",
+    desc: "Binary file bytes (GLB/FBX/PNG/WAV…) — immutable CDN cache",
+  },
+  {
+    method: "GET",
+    url: "https://objectstore.grudge-studio.com/api/v1/{pack}.json",
+    desc: "Definition packs (weapons, materials, recipes) — not mesh blobs",
+  },
 ];
 
 const DNS_RECORDS = [
@@ -136,6 +177,71 @@ export default function Docs() {
           Smoke: <code className="text-primary">curl http://{VPS2_IP}:{COLYSEUS_PORT}/health</code>
           {" · "}
           Worker: <code className="text-primary">COLYSEUS_HOST={VPS2_IP}</code> on grudge-game-servers
+        </p>
+      </section>
+
+      {/* Warlords asset catalog */}
+      <section className="mb-8">
+        <h2 className="text-lg mb-3">Warlords assets (dash)</h2>
+        <p className="text-xs text-muted-foreground mb-3 max-w-3xl">
+          Live catalog at{" "}
+          <a href="/asset-browser" className="text-primary hover:underline">
+            /asset-browser
+          </a>{" "}
+          loads every D1 <code className="text-primary">asset_registry</code> row and links CDN
+          URLs. Player/game state still lives only on Railway — never treat D1 as island/character
+          SSOT. Production meshes: registry + R2 only (no Meshy/capsule placeholders).
+        </p>
+        <div className="inset-panel overflow-x-auto mb-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Dash path</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Name</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DASH_ASSET_PAGES.map((p) => (
+                <tr key={p.path} className="border-b border-border/50">
+                  <td className="px-3 py-1.5">
+                    <a href={p.path} className="text-primary text-xs font-mono hover:underline">
+                      {p.path}
+                    </a>
+                    {p.alias && (
+                      <span className="block text-[0.6rem] text-muted-foreground font-mono">{p.alias}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 font-medium text-xs">{p.name}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground text-xs">{p.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="inset-panel overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Method</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Endpoint</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ASSET_API_ENDPOINTS.map((e) => (
+                <tr key={e.url} className="border-b border-border/50">
+                  <td className="px-3 py-1.5 font-mono text-xs text-warning">{e.method}</td>
+                  <td className="px-3 py-1.5 font-mono text-[0.65rem] text-primary break-all">{e.url}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground text-xs">{e.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Client: <code className="text-primary">src/lib/assetRegistry.ts</code> · UI:{" "}
+          <code className="text-primary">src/pages/AssetBrowser.tsx</code>
         </p>
       </section>
 

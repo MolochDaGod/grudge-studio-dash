@@ -15,6 +15,8 @@ import GDevelop from "./pages/games/GDevelop";
 import Tools from "./pages/games/Tools";
 import Services from "./pages/Services";
 import Storage from "./pages/Storage";
+import AssetsPage from "./pages/Assets";
+import AssetBrowser from "./pages/AssetBrowser";
 import DatabasePage from "./pages/Database";
 import Logs from "./pages/Logs";
 import Lobbies from "./pages/Lobbies";
@@ -60,6 +62,9 @@ export default function App() {
           <Route path="/railway" component={Railway} />
           <Route path="/deploy" component={Deploy} />
           <Route path="/storage" component={Storage} />
+          <Route path="/assets" component={AssetsPage} />
+          <Route path="/asset-browser" component={AssetBrowser} />
+          <Route path="/warlords-assets" component={AssetBrowser} />
           <Route path="/database" component={DatabasePage} />
           <Route path="/schema" component={SchemaEditor} />
           <Route path="/query" component={Query} />

@@ -5,20 +5,23 @@ import { StatCard, DataTable } from "../components/Cards";
 import { dbApi } from "../lib/api";
 import { API } from "../lib/config";
 
-/** Railway Postgres SSOT tables (Drizzle / grudge-api) — not legacy VPS MySQL alone */
+/** Railway Postgres SSOT tables (Drizzle shared/schema.ts) — not D1 / not legacy VPS MySQL */
 const SSOT_TABLES = [
   "users",
+  "accounts",
   "characters",
-  "inventory_items",
-  "crafted_items",
+  "account_inventory",
+  "account_resources",
   "home_islands",
-  "islands",
-  "auth_tokens",
+  "player_ships",
+  "character_professions",
+  "parties",
+  "player_resources",
   "uuid_ledger",
-  "resource_ledger",
-  "shop_transactions",
-  "game_sessions",
-  "ai_agents",
+  "gbux_transactions",
+  "linked_wallets",
+  "world_zones",
+  "player_blocks",
 ];
 
 export default function DatabasePage() {

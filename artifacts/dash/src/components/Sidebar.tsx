@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Gamepad2, Swords, Fish, Joystick, Wrench,
   Server, HardDrive, Database, ScrollText, Rocket, Train,
   Trophy, Layers, Monitor, TableProperties, Search, Coins,
-  Settings2, BookOpen, LogOut, Crosshair, Flame, Settings,
+  Settings2, BookOpen, LogOut, Crosshair, Flame, Settings, Package, Boxes,
 } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 
@@ -49,6 +49,8 @@ const NAV = [
   {
     section: "Data",
     items: [
+      { href: "/asset-browser", label: "Warlords Assets", icon: Boxes },
+      { href: "/assets", label: "Assets & SSOT", icon: Package },
       { href: "/database", label: "Tables", icon: Database },
       { href: "/schema", label: "Schema Editor", icon: TableProperties },
       { href: "/query", label: "Query", icon: Search },

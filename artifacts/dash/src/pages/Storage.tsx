@@ -14,8 +14,12 @@ export default function Storage() {
     <div>
       <TopBar title="Object Storage" />
 
-      <p className="text-sm text-muted-foreground mb-6">
-        Cloudflare R2 storage at <span className="text-primary">assets.grudge-studio.com</span> — managed via asset-service.
+      <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
+        <span className="text-primary font-semibold">Cloudflare R2</span> binaries at{" "}
+        <span className="text-primary">assets.grudge-studio.com</span> (icons, models, audio).{" "}
+        <strong className="text-foreground">D1 is registry/index only</strong> (asset_registry r2_key → uuid) —
+        not characters, not islands, not inventory. Player state = Railway Postgres. See{" "}
+        <a href="/assets" className="text-primary hover:underline">Assets &amp; SSOT</a>.
       </p>
 
       <div className="grid grid-cols-3 gap-4 mb-6">
@@ -51,8 +55,8 @@ export default function Storage() {
       </div>
 
       {buckets.isError && (
-        <div className="inset-panel p-4 mt-4 text-sm text-danger">
-          Could not connect to storage API — ensure MinIO proxy is configured on the Game API.
+        <div className="inset-panel p-4 mt-4 text-sm text-muted-foreground">
+          Bucket list API optional — CDN serves R2 directly at assets.grudge-studio.com. Object catalog: ObjectStore D1 registry (not player DB).
         </div>
       )}
     </div>

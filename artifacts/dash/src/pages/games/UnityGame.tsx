@@ -49,7 +49,7 @@ export default function UnityGame() {
           <p><span className="text-primary">Repo:</span> {REPO}</p>
           <p><span className="text-primary">Deploy:</span> Vercel (gruda-wars.vercel.app)</p>
           <p><span className="text-primary">Engine:</span> Unity WebGL Build</p>
-          <p><span className="text-primary">Backend:</span> api.grudge-studio.com (shared Game API)</p>
+          <p><span className="text-primary">Backend:</span> Railway grudge-api (shared Game API)</p>
           <p><span className="text-primary">DB Tables:</span> characters, items, battle_arena_stats, sessions</p>
         </div>
       </section>

@@ -287,7 +287,7 @@ export const GRUDGE_APPS: GrudgeApp[] = [
   {
     id: "grudge-backend",
     name: "Grudge Backend (unified API)",
-    description: "Auth gateway + unified API — id.grudge-studio.com, api.grudge-studio.com",
+    description: "Auth gateway id.grudge-studio.com · game API Railway grudge-api (dead: api.grudge-studio.com)",
     category: "infra",
     liveUrl: "https://id.grudge-studio.com",
     repo: "MolochDaGod/grudge-backend",
