@@ -11,6 +11,7 @@ import { StatCard } from "../components/Cards";
 import { API, GAME_API_BASE } from "../lib/config";
 import { ASSETS_CDN, OBJECTSTORE, ENGINE_META } from "../lib/assets";
 import { checkHealth, type HealthResult } from "../lib/api";
+import { ASSET_REGISTRY_API, ASSET_UPLOAD_API } from "../lib/assetRegistry";
 
 // ── SSOT topology (canonical) ───────────────────────────────────────────
 
@@ -229,7 +230,14 @@ const PUTER_APPS = [
     name: "Puter App: Warlords",
     url: "https://puter.com/app/warlords",
     role: "Desktop shell → index_url grudgewarlords.com",
-    data: "Same Vercel client + same-origin /api → Railway",
+    data: "Same Vercel client + same-origin /api → Railway 0d46",
+  },
+  {
+    id: "grudox-app",
+    name: "Puter App: Grudox",
+    url: "https://puter.com/app/Grudox",
+    role: "Desktop shell → index_url grudox.grudge-studio.com · Grudge ID SSO",
+    data: "Characters on Railway · shipwreck grudge6 select · /warlords-shipwreck.html",
   },
 ];
 
@@ -272,12 +280,41 @@ export default function AssetsPage() {
   const fleet = useQuery({
     queryKey: ["assets-hub-fleet"],
     queryFn: async () => {
-      const [cdn, puter] = await Promise.all([
+      const [cdn, puter, grudox, registry] = await Promise.all([
         probeJson(`${ASSETS_CDN}/js/grudge-fleet.js`),
         probeJson("https://grudge-crafting.puter.site/grudge-fleet.js"),
+        probeJson("https://grudox.grudge-studio.com/grudge-fleet.js"),
+        probeJson(`${ASSET_REGISTRY_API}/assets?limit=1`),
       ]);
-      return { cdn, puter };
+      return { cdn, puter, grudox, registry };
     },
+  });
+
+  /** Authenticated R2 user-uploads list (Railway) — empty list is OK. */
+  const myUploads = useQuery({
+    queryKey: ["assets-hub-my-uploads"],
+    queryFn: async () => {
+      try {
+        const raw = sessionStorage.getItem("grudge_dash_session");
+        const token = raw ? JSON.parse(raw)?.token : null;
+        if (!token) return { auth: false as const, items: [] as unknown[], error: "Sign in for R2 uploads" };
+        const res = await fetch(`${ASSET_UPLOAD_API}/api/assets/list?limit=50`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (res.status === 401) return { auth: false as const, items: [], error: "Session expired" };
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { auth: true as const, items: [], error: (err as { error?: string }).error || res.statusText };
+        }
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : data.items || data.objects || data.assets || [];
+        return { auth: true as const, items, error: null as string | null };
+      } catch (e) {
+        return { auth: false as const, items: [], error: String(e) };
+      }
+    },
+    refetchInterval: 90_000,
   });
 
   const okHealth = health.data?.filter((h) => h.ok).length ?? 0;
@@ -366,7 +403,7 @@ export default function AssetsPage() {
           </div>
         </div>
         <div className="inset-panel p-4 mt-3 text-xs">
-          <h3 className="text-sm font-semibold mb-2">grudge-fleet.js</h3>
+          <h3 className="text-sm font-semibold mb-2">grudge-fleet.js + registry</h3>
           <p className="text-muted-foreground mb-1">
             CDN:{" "}
             <span className={fleet.data?.cdn.ok ? "text-success" : "text-danger"}>
@@ -377,11 +414,48 @@ export default function AssetsPage() {
             <span className={fleet.data?.puter.ok ? "text-success" : "text-danger"}>
               {fleet.data?.puter.ok ? `ok ${fleet.data.puter.ms}ms` : "down"}
             </span>
+            {" · "}
+            Grudox:{" "}
+            <span className={fleet.data?.grudox.ok ? "text-success" : "text-danger"}>
+              {fleet.data?.grudox.ok ? `ok ${fleet.data.grudox.ms}ms` : "down"}
+            </span>
+            {" · "}
+            D1 registry:{" "}
+            <span className={fleet.data?.registry.ok ? "text-success" : "text-danger"}>
+              {fleet.data?.registry.ok ? `ok ${fleet.data.registry.ms}ms` : "down"}
+            </span>
           </p>
           <p className="text-muted-foreground">
-            Target ≥ 2.5.2 with sso_token-first handoff. Deploy:{" "}
+            Target ≥ 3.1.0 on grudox (id + Railway 0d46 + grudge6 shipwreck). Crafting:{" "}
             <code className="text-primary">npm run deploy:puter:crafting</code>
           </p>
+        </div>
+        <div className="inset-panel p-4 mt-3 text-xs">
+          <h3 className="text-sm font-semibold mb-2">My R2 uploads (Railway)</h3>
+          <p className="text-muted-foreground mb-2 font-mono break-all">
+            GET {GAME_API_BASE}/api/assets/list · prefix user-uploads/&lt;grudgeId&gt;/
+          </p>
+          {!myUploads.data?.auth ? (
+            <p className="text-warning">{myUploads.data?.error || "Sign in to list personal uploads"}</p>
+          ) : myUploads.data.error ? (
+            <p className="text-danger">{myUploads.data.error}</p>
+          ) : myUploads.data.items.length === 0 ? (
+            <p className="text-muted-foreground">
+              No objects under your prefix (empty is OK). Upload via POST /api/assets/upload (presign) or ObjectStore.
+            </p>
+          ) : (
+            <ul className="max-h-40 overflow-y-auto space-y-1 font-mono">
+              {myUploads.data.items.slice(0, 40).map((it: unknown, i: number) => {
+                const row = it as { key?: string; name?: string; url?: string; publicUrl?: string };
+                const label = row.key || row.name || row.url || row.publicUrl || JSON.stringify(it).slice(0, 80);
+                return (
+                  <li key={i} className="truncate text-foreground/90">
+                    {label}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </section>
 

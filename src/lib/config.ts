@@ -77,12 +77,12 @@ export const FLAGSHIP_GAMES: FlagshipGame[] = [
     short: "Grudox",
     icon: "◈",
     liveUrl: "https://grudox.grudge-studio.com",
-    playUrl: "https://grudox.grudge-studio.com/arpg-game/",
+    playUrl: "https://grudox.grudge-studio.com/warlords-shipwreck.html",
     dashPath: "/games/grudox",
-    repo: "MolochDaGod/survival",
+    repo: "MolochDaGod/grudox",
     description:
-      "Grudge Nexus era — low-poly voxel world, Quaternius characters, grudge-control locomotion, LED mask CNFT entry",
-    apiBase: "survival",
+      "Fleet hub + ARPG + Warlords shipwreck grudge6 select for open-world MMO — Grudge ID + Railway 0d46 characters",
+    apiBase: "api",
   },
 ];
 
