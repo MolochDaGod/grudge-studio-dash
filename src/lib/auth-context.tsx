@@ -47,6 +47,19 @@ const FLEET_TOKEN_KEYS = [
 
 const ADMIN_ROLES = new Set(["admin", "master", "owner", "master_admin", "master-admin"]);
 
+/**
+ * TOP ADMIN operators — must match GrudgeBuilder shared/fleet/adminAllowlist.ts.
+ * Used when /api/auth/me still returns player (legacy JWT) but identity is allowlisted.
+ */
+const CANONICAL_ADMIN_USERNAMES = new Set(["grudachain", "molochdadev"]);
+const CANONICAL_ADMIN_EMAILS = new Set(["grudgedev@gmail.com", "jonbemmons@gmail.com"]);
+const CANONICAL_MASTER_USERNAMES = new Set(["grudachain"]);
+const CANONICAL_MASTER_EMAILS = new Set(["grudgedev@gmail.com"]);
+
+function normalizeToken(v: string | null | undefined): string {
+  return (v ?? "").trim().toLowerCase();
+}
+
 function saveSession(user: AdminUser) {
   // Prefer localStorage so session survives tab close (90d fleet policy)
   try {
@@ -176,6 +189,26 @@ function isAdminRole(role?: string | null): boolean {
   return ADMIN_ROLES.has(String(role).toLowerCase());
 }
 
+/** Elevate allowlisted TOP ADMIN even when API role is still "player". */
+function resolveDashRole(me: {
+  role?: string | null;
+  isAdmin?: boolean;
+  email?: string | null;
+  username?: string | null;
+  displayName?: string | null;
+}): string {
+  const email = normalizeToken(me.email);
+  const names = [me.username, me.displayName].map(normalizeToken).filter(Boolean);
+
+  if (email && CANONICAL_MASTER_EMAILS.has(email)) return "master";
+  if (names.some((n) => CANONICAL_MASTER_USERNAMES.has(n))) return "master";
+  if (email && CANONICAL_ADMIN_EMAILS.has(email)) return "admin";
+  if (names.some((n) => CANONICAL_ADMIN_USERNAMES.has(n))) return "admin";
+  if (me.isAdmin === true) return me.role && isAdminRole(me.role) ? String(me.role).toLowerCase() : "admin";
+  if (isAdminRole(me.role)) return String(me.role).toLowerCase();
+  return String(me.role || "player").toLowerCase();
+}
+
 async function fetchMe(token: string): Promise<{
   id?: string;
   username?: string;
@@ -183,8 +216,10 @@ async function fetchMe(token: string): Promise<{
   grudgeId?: string;
   grudge_id?: string;
   role?: string;
+  email?: string;
+  isAdmin?: boolean;
 }> {
-  // Prefer same-origin proxy when available, then ID hub API
+  // Prefer same-origin proxy when available, then ID hub API, then Railway direct
   const bases = [
     `${window.location.origin}/api/auth/me`,
     `${ID_BASE}/api/auth/me`,
@@ -244,15 +279,19 @@ async function establishAdminSession(rawToken: string): Promise<AdminUser> {
   // Launch tokens from ID handoff are short-lived; exchange when possible
   token = await exchangeLaunchToken(rawToken);
   const me = await fetchMe(token);
-  const role = me.role || "player";
+  const role = resolveDashRole(me);
   if (!isAdminRole(role)) {
-    throw new Error("Access denied — admin or master role required on this Grudge ID");
+    throw new Error(
+      "Access denied — admin or master role required on this Grudge ID. " +
+        "TOP ADMIN: sign in as Puter grudachain / grudgedev@gmail.com (or molochdadev). " +
+        "If you just upgraded Railway, log out and sign in again so /api/auth/me returns role=master.",
+    );
   }
   return {
     token,
     grudgeId: me.grudgeId || me.grudge_id || "",
     username: me.displayName || me.username || "Admin",
-    role: String(role).toLowerCase(),
+    role,
   };
 }
 
