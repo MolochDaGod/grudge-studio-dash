@@ -6,6 +6,7 @@ import {
   Settings2, BookOpen, LogOut, Crosshair, Flame, Settings, Package, Boxes,
 } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
+import { useGrudgePanel } from "./GrudgePanel";
 
 const NAV = [
   {
@@ -78,6 +79,7 @@ const NAV = [
 export default function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { open: openPanel, setActiveTab } = useGrudgePanel();
 
   return (
     <aside className="fantasy-panel fixed left-0 top-12 bottom-0 w-56 flex flex-col z-50 overflow-y-auto">
@@ -129,9 +131,19 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-border">
-        <div className="flex items-center justify-between mb-2">
+      {/* Footer — opens right Grudge Panel (merged account + studio rail) */}
+      <div className="p-3 border-t border-border space-y-2">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("profile");
+            openPanel();
+          }}
+          className="w-full text-left px-2 py-1.5 rounded text-[0.65rem] text-primary hover:bg-accent border border-primary/20"
+        >
+          Open Grudge Panel →
+        </button>
+        <div className="flex items-center justify-between">
           <span className="text-[0.6rem] text-muted-foreground">{user?.username || "Admin"}</span>
           <button onClick={logout} className="p-1 rounded hover:bg-accent" title="Logout">
             <LogOut size={12} className="text-muted-foreground hover:text-danger" />

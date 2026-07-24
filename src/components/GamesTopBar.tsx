@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { FLAGSHIP_GAMES, SERVICES } from "../lib/config";
 import { checkAllHealth } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
-import { ExternalLink, Activity } from "lucide-react";
+import { useGrudgePanel } from "./GrudgePanel";
+import { ExternalLink, Activity, Shield } from "lucide-react";
 
 export default function GamesTopBar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { toggle, isOpen } = useGrudgePanel();
   const health = useQuery({
     queryKey: ["health"],
     queryFn: checkAllHealth,
@@ -77,9 +79,19 @@ export default function GamesTopBar() {
             Query
           </Link>
           {user && (
-            <span className="text-gold-light font-semibold hidden sm:inline">
-              {user.username}
-            </span>
+            <button
+              type="button"
+              onClick={toggle}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-semibold transition-colors ${
+                isOpen
+                  ? "border-primary/50 bg-primary/15 text-primary"
+                  : "border-border text-gold-light hover:border-primary/40"
+              }`}
+              title="Open Grudge Panel"
+            >
+              <Shield size={14} />
+              <span className="hidden sm:inline">{user.username}</span>
+            </button>
           )}
         </div>
       </div>

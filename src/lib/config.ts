@@ -298,7 +298,8 @@ export const GRUDGE_APPS: GrudgeApp[] = [
   {
     id: "grudge-dash",
     name: "Grudge Studio Dashboard",
-    description: "Admin dashboard — this app",
+    description:
+      "Admin dashboard — left nav + right Grudge Panel (account, studio shortcuts, portal games). Merged with portal panel UX.",
     category: "infra",
     liveUrl: "https://dash.grudge-studio.com",
     repo: "MolochDaGod/grudge-studio-dash",
