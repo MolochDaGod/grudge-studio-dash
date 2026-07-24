@@ -3,9 +3,23 @@ import { API, SERVICES, type ServiceKey } from "./config";
 // ── Auth token accessor ─────────────────────────────────────────
 function getToken(): string | null {
   try {
-    const raw = sessionStorage.getItem("grudge_dash_session");
-    if (!raw) return null;
-    return JSON.parse(raw)?.token || null;
+    const raw =
+      localStorage.getItem("grudge_dash_session") ||
+      sessionStorage.getItem("grudge_dash_session");
+    if (raw) {
+      const t = JSON.parse(raw)?.token;
+      if (t) return t;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    return (
+      localStorage.getItem("grudge_auth_token") ||
+      localStorage.getItem("grudge_session_token") ||
+      localStorage.getItem("grudge.token") ||
+      localStorage.getItem("sso_token")
+    );
   } catch {
     return null;
   }

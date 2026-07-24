@@ -1,6 +1,7 @@
 import { Route, Switch } from "wouter";
 import Sidebar from "./components/Sidebar";
 import GamesTopBar from "./components/GamesTopBar";
+import { GrudgePanelProvider } from "./components/GrudgePanel";
 
 // Pages
 import Overview from "./pages/Overview";
@@ -35,51 +36,54 @@ import Settings from "./pages/Settings";
 
 export default function App() {
   return (
-    <div className="min-h-screen">
-      <GamesTopBar />
-      <Sidebar />
-      <main className="ml-56 pt-14 p-6">
-        <Switch>
-          <Route path="/" component={Overview} />
-          {/* Canonical Grudge ID return path — AuthProvider picks up ?grudge_token= */}
-          <Route path="/auth/callback" component={Overview} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/accounts" component={Accounts} />
-          <Route path="/games/warlords" component={Warlords} />
-          <Route path="/games/carrier" component={Carrier} />
-          <Route path="/games/grudox" component={Grudox} />
-          <Route path="/games/unity" component={UnityGame} />
-          <Route path="/games/grudge-wars" component={GrudgeWars} />
-          <Route path="/games/angeler" component={Angeler} />
-          <Route path="/games/gdevelop" component={GDevelop} />
-          <Route path="/games/tools" component={Tools} />
-          <Route path="/lobbies" component={Lobbies} />
-          <Route path="/arena" component={Arena} />
-          <Route path="/battle" component={Battle} />
-          <Route path="/tcg" component={TCG} />
-          <Route path="/unity-servers" component={UnityServers} />
-          <Route path="/services" component={Services} />
-          <Route path="/railway" component={Railway} />
-          <Route path="/deploy" component={Deploy} />
-          <Route path="/storage" component={Storage} />
-          <Route path="/assets" component={AssetsPage} />
-          <Route path="/asset-browser" component={AssetBrowser} />
-          <Route path="/warlords-assets" component={AssetBrowser} />
-          <Route path="/database" component={DatabasePage} />
-          <Route path="/schema" component={SchemaEditor} />
-          <Route path="/query" component={Query} />
-          <Route path="/economy" component={Economy} />
-          <Route path="/logs" component={Logs} />
-          <Route path="/mode-configs" component={ModeConfigs} />
-          <Route path="/docs" component={Docs} />
-          <Route>
-            <div className="text-center py-20">
-              <h1 className="text-3xl">404</h1>
-              <p className="text-muted-foreground mt-2">Page not found</p>
-            </div>
-          </Route>
-        </Switch>
-      </main>
-    </div>
+    <GrudgePanelProvider>
+      <div className="min-h-screen">
+        <GamesTopBar />
+        <Sidebar />
+        {/* pr-2 keeps content clear of edge tab; panel overlays when open */}
+        <main className="ml-56 pt-14 p-6 pr-8">
+          <Switch>
+            <Route path="/" component={Overview} />
+            {/* Canonical Grudge ID return path — AuthProvider picks up ?grudge_token= */}
+            <Route path="/auth/callback" component={Overview} />
+            <Route path="/settings" component={Settings} />
+            <Route path="/accounts" component={Accounts} />
+            <Route path="/games/warlords" component={Warlords} />
+            <Route path="/games/carrier" component={Carrier} />
+            <Route path="/games/grudox" component={Grudox} />
+            <Route path="/games/unity" component={UnityGame} />
+            <Route path="/games/grudge-wars" component={GrudgeWars} />
+            <Route path="/games/angeler" component={Angeler} />
+            <Route path="/games/gdevelop" component={GDevelop} />
+            <Route path="/games/tools" component={Tools} />
+            <Route path="/lobbies" component={Lobbies} />
+            <Route path="/arena" component={Arena} />
+            <Route path="/battle" component={Battle} />
+            <Route path="/tcg" component={TCG} />
+            <Route path="/unity-servers" component={UnityServers} />
+            <Route path="/services" component={Services} />
+            <Route path="/railway" component={Railway} />
+            <Route path="/deploy" component={Deploy} />
+            <Route path="/storage" component={Storage} />
+            <Route path="/assets" component={AssetsPage} />
+            <Route path="/asset-browser" component={AssetBrowser} />
+            <Route path="/warlords-assets" component={AssetBrowser} />
+            <Route path="/database" component={DatabasePage} />
+            <Route path="/schema" component={SchemaEditor} />
+            <Route path="/query" component={Query} />
+            <Route path="/economy" component={Economy} />
+            <Route path="/logs" component={Logs} />
+            <Route path="/mode-configs" component={ModeConfigs} />
+            <Route path="/docs" component={Docs} />
+            <Route>
+              <div className="text-center py-20">
+                <h1 className="text-3xl">404</h1>
+                <p className="text-muted-foreground mt-2">Page not found</p>
+              </div>
+            </Route>
+          </Switch>
+        </main>
+      </div>
+    </GrudgePanelProvider>
   );
 }

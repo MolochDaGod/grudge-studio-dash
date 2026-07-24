@@ -1,10 +1,18 @@
 /**
  * Live D1 asset_registry browser client.
- * SSOT endpoint: https://api.grudge-studio.com/assets (grudge-assets-db)
+ * Public catalog index: https://api.grudge-studio.com/assets (Workers D1 registry — read-only index)
+ * Player runtime / user uploads: Railway GAME_DATA  /api/assets/list|upload (R2 user-uploads/)
  * Binaries: https://assets.grudge-studio.com/{r2Key}
+ *
+ * Do NOT use api.grudge-studio.com for auth or character SSOT (deprecated tunnel for game state).
  */
 
+import { GAME_API_BASE } from "./config";
+
+/** D1 registry list (public catalog browser). */
 export const ASSET_REGISTRY_API = "https://api.grudge-studio.com";
+/** Railway game API — authenticated R2 user-uploads list/presign. */
+export const ASSET_UPLOAD_API = GAME_API_BASE;
 export const ASSETS_CDN = "https://assets.grudge-studio.com";
 
 export interface RegistryAsset {
