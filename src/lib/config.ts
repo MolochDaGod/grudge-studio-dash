@@ -86,41 +86,298 @@ export const FLAGSHIP_GAMES: FlagshipGame[] = [
   },
 ];
 
+/**
+ * Backend service inventory for /services health probes.
+ * Best practices:
+ *  - One row per *distinct* origin (don't duplicate api + account)
+ *  - healthPath must return JSON or 2xx/401/403 (not marketing 404 HTML as "ok")
+ *  - Prefer same-host /api/health over guessing /healthz
+ */
+export type ServiceLayer = "identity" | "game-api" | "realtime" | "assets" | "tools" | "edge";
+
 export type ServiceKey =
   | "auth"
   | "api"
-  | "account"
   | "survival"
+  | "engine"
   | "launcher"
   | "ai"
-  | "ws"
   | "colyseus"
   | "game-servers"
   | "assets-api"
   | "assets-cdn"
-  | "forge-api";
+  | "forge"
+  | "open-api";
 
 export interface ServiceDef {
   key: ServiceKey;
   name: string;
+  /** Origin only (no path) */
   url: string;
+  /** GET path for probe — absolute path on origin */
+  healthPath: string;
   description: string;
+  layer: ServiceLayer;
+  /** Optional note shown on Services page */
+  notes?: string;
 }
 
 export const SERVICES: ServiceDef[] = [
-  { key: "auth", name: "Grudge ID", url: API.auth, description: "id.grudge-studio.com — Login, JWT, OAuth, brand logo" },
-  { key: "api", name: "Game API (Railway)", url: API.api, description: "Postgres SSOT — characters, islands, wallet, inventory, economy" },
-  { key: "account", name: "Account (Railway)", url: API.account, description: "Same Railway origin — /api/account/* profiles & bag" },
-  { key: "survival", name: "Nexus API", url: API.survival, description: "Grudox / Nexus era — accounts, masks, world saves" },
-  { key: "launcher", name: "Launcher", url: API.launcher, description: "launcher.grudge-studio.com — Game launcher" },
-  { key: "ai", name: "AI Hub", url: API.ai, description: "ai.grudge-studio.com — Legion agents, Gemini BYOK" },
-  { key: "ws", name: "Realtime (Railway WS)", url: API.ws.replace("wss://", "https://"), description: "Colyseus / fleet realtime on grudge-api" },
-  { key: "colyseus", name: "Colyseus", url: API.colyseus, description: "Authoritative multiplayer rooms (Railway)" },
-  { key: "game-servers", name: "Game Servers Worker", url: API.gameServers, description: "Edge matchmake + lobby routing" },
-  { key: "assets-api", name: "ObjectStore", url: API.assetsApi, description: "Catalog JSON, upload, metadata (D1 + R2)" },
-  { key: "assets-cdn", name: "Assets CDN", url: API.assetsCdn, description: "assets.grudge-studio.com — icons, models, audio (R2)" },
-  { key: "forge-api", name: "GameForge API", url: "https://forge-api.grudge-studio.com", description: "Scene editor backend, AI, R2, navmesh" },
+  {
+    key: "auth",
+    name: "Grudge ID",
+    url: API.auth,
+    healthPath: "/login",
+    layer: "identity",
+    description: "SSO gateway — JWT mint, OAuth, brand login",
+    notes: "Canonical login host. Never use dead api.grudge-studio.com for auth.",
+  },
+  {
+    key: "api",
+    name: "Game API (Railway 0d46)",
+    url: API.api,
+    healthPath: "/api/health",
+    layer: "game-api",
+    description: "Postgres SSOT — characters, account bag, island, wallet, economy",
+    notes: "/api/account/* and /api/characters share this origin. Use /api/health (not /healthz).",
+  },
+  {
+    key: "survival",
+    name: "Nexus / Grudox API",
+    url: API.survival,
+    healthPath: "/api/healthz",
+    layer: "game-api",
+    description: "Survival-api — Nexus accounts, masks, engine manifest",
+    notes: "Canonical host survival-api-production. Do not use Streamlit misdeploys.",
+  },
+  {
+    key: "engine",
+    name: "The-ENGINE (portal API)",
+    url: "https://the-engine.up.railway.app",
+    healthPath: "/api/health",
+    layer: "game-api",
+    description: "Rec0deD portal — scores, challenges, GBUX, chat",
+    notes: "grudge-studio.com /api/* rewrites here for scores/leaderboards/auth pages.",
+  },
+  {
+    key: "open-api",
+    name: "Open same-origin API",
+    url: "https://open.grudge-studio.com",
+    healthPath: "/api/health",
+    layer: "game-api",
+    description: "Open/Danger health via Vercel → Railway rewrite",
+    notes: "Browser clients must use same-origin /api/* on open.*",
+  },
+  {
+    key: "colyseus",
+    name: "Realtime (Colyseus / WS)",
+    url: API.colyseus,
+    healthPath: "/api/health",
+    layer: "realtime",
+    description: "Authoritative rooms on grudge-api Railway process",
+    notes: "Same host as Game API; WS upgrade not available on Vercel alone.",
+  },
+  {
+    key: "game-servers",
+    name: "Game Servers Worker",
+    url: API.gameServers,
+    healthPath: "/health",
+    layer: "realtime",
+    description: "Edge matchmake + lobby routing worker",
+  },
+  {
+    key: "assets-api",
+    name: "ObjectStore",
+    url: API.assetsApi,
+    healthPath: "/health",
+    layer: "assets",
+    description: "Catalog JSON, upload, metadata (D1 + R2)",
+  },
+  {
+    key: "assets-cdn",
+    name: "Assets CDN (R2)",
+    url: API.assetsCdn,
+    healthPath: "/js/grudge-fleet.js",
+    layer: "assets",
+    description: "Binary CDN — icons, GLB, fleet JS",
+    notes: "Probe a real object path; root / may 404.",
+  },
+  {
+    key: "ai",
+    name: "AI Hub",
+    url: API.ai,
+    healthPath: "/health",
+    layer: "tools",
+    description: "ai.grudge-studio.com — Legion agents, BYOK",
+  },
+  {
+    key: "forge",
+    name: "GameForge",
+    url: "https://forge.grudge-studio.com",
+    healthPath: "/",
+    layer: "tools",
+    description: "Scene editor SPA (forge-api separate when bound)",
+  },
+  {
+    key: "launcher",
+    name: "Launcher",
+    url: API.launcher,
+    healthPath: "/",
+    layer: "edge",
+    description: "launcher.grudge-studio.com — game launcher shell",
+  },
 ];
+
+export const SERVICE_LAYER_LABEL: Record<ServiceLayer, string> = {
+  identity: "Identity",
+  "game-api": "Game APIs",
+  realtime: "Realtime / rooms",
+  assets: "Assets",
+  tools: "Tools",
+  edge: "Edge / shells",
+};
+
+/**
+ * Player-facing game + product deployments (SPA / hubs).
+ * healthPath should be a cheap GET that proves the app shell or API is live.
+ */
+export interface GameDeployment {
+  id: string;
+  name: string;
+  icon: string;
+  /** Public URL players open */
+  liveUrl: string;
+  /** Probe path on liveUrl origin */
+  healthPath: string;
+  /** Backend dependency keys from SERVICES */
+  backends: ServiceKey[];
+  repo?: string;
+  dashPath?: string;
+  tier: "flagship" | "combat" | "portal" | "studio" | "satellite";
+  description: string;
+}
+
+export const GAME_DEPLOYMENTS: GameDeployment[] = [
+  {
+    id: "warlords",
+    name: "Warlords",
+    icon: "⚔️",
+    liveUrl: "https://grudgewarlords.com",
+    healthPath: "/",
+    backends: ["auth", "api", "assets-cdn", "assets-api"],
+    repo: "MolochDaGod/Grudge-Builder",
+    dashPath: "/games/warlords",
+    tier: "flagship",
+    description: "Main MMO client — Railway characters + account bag",
+  },
+  {
+    id: "client",
+    name: "Client (home island)",
+    icon: "🏝️",
+    liveUrl: "https://client.grudge-studio.com",
+    healthPath: "/",
+    backends: ["auth", "api", "assets-cdn"],
+    repo: "MolochDaGod/Grudge-Builder",
+    tier: "flagship",
+    description: "Foundry play handoff — zone / lobby / world",
+  },
+  {
+    id: "grudox",
+    name: "GRUDOX",
+    icon: "◈",
+    liveUrl: "https://grudox.grudge-studio.com",
+    healthPath: "/",
+    backends: ["auth", "api", "survival", "assets-cdn"],
+    repo: "MolochDaGod/grudox",
+    dashPath: "/games/grudox",
+    tier: "flagship",
+    description: "Fleet hub + shipwreck / Carrier edge WS",
+  },
+  {
+    id: "open",
+    name: "Open / Danger Room",
+    icon: "🔥",
+    liveUrl: "https://open.grudge-studio.com",
+    healthPath: "/api/health",
+    backends: ["auth", "api", "open-api", "assets-cdn", "engine"],
+    repo: "MolochDaGod/gameopen",
+    tier: "combat",
+    description: "Combat labs + annihilate-demo grudge6",
+  },
+  {
+    id: "portal",
+    name: "Portal (Rec0deD)",
+    icon: "🕹️",
+    liveUrl: "https://grudge-studio.com",
+    healthPath: "/api/health",
+    backends: ["auth", "engine", "assets-cdn"],
+    repo: "MolochDaGod/The-ENGINE",
+    tier: "portal",
+    description: "Retro library, PvP hub, leaderboards, Grudge Panel",
+  },
+  {
+    id: "dash",
+    name: "Studio Dashboard",
+    icon: "📊",
+    liveUrl: "https://dash.grudge.studio",
+    healthPath: "/",
+    backends: ["auth", "api"],
+    repo: "MolochDaGod/grudge-studio-dash",
+    tier: "studio",
+    description: "Admin shell + right Grudge Panel (this app)",
+  },
+  {
+    id: "foundry",
+    name: "Character Foundry",
+    icon: "👤",
+    liveUrl: "https://character.grudge-studio.com",
+    healthPath: "/",
+    backends: ["auth", "api", "assets-cdn"],
+    tier: "studio",
+    description: "Create-only heroes → 4-slot → client play",
+  },
+  {
+    id: "forge",
+    name: "GameForge",
+    icon: "🔥",
+    liveUrl: "https://forge.grudge-studio.com",
+    healthPath: "/",
+    backends: ["auth", "forge", "assets-api", "assets-cdn"],
+    dashPath: "/games/tools",
+    tier: "studio",
+    description: "Three.js scene / map editor",
+  },
+  {
+    id: "carrier",
+    name: "Carrier / Armada",
+    icon: "🛸",
+    liveUrl: "https://armada.grudge-studio.com",
+    healthPath: "/",
+    backends: ["auth", "api"],
+    repo: "MolochDaGod/grim-armada-web",
+    dashPath: "/games/carrier",
+    tier: "satellite",
+    description: "Tactical carrier combat",
+  },
+  {
+    id: "water",
+    name: "Water / home island",
+    icon: "🌊",
+    liveUrl: "https://water.grudge-studio.com",
+    healthPath: "/",
+    backends: ["auth", "api", "assets-cdn"],
+    tier: "satellite",
+    description: "Warlords island water client",
+  },
+];
+
+export const DEPLOY_TIER_LABEL: Record<GameDeployment["tier"], string> = {
+  flagship: "Flagship",
+  combat: "Combat labs",
+  portal: "Portal",
+  studio: "Studio tools",
+  satellite: "Satellites",
+};
 
 export type AppCategory = "game" | "editor" | "tool" | "infra" | "web3";
 

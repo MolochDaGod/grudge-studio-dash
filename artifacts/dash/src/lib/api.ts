@@ -1,4 +1,4 @@
-import { API, SERVICES, type ServiceKey } from "./config";
+import { API, SERVICES, GAME_DEPLOYMENTS, type ServiceKey } from "./config";
 
 // ── Auth token accessor ─────────────────────────────────────────
 function getToken(): string | null {
@@ -58,50 +58,79 @@ export interface HealthResult {
   key: ServiceKey;
   name: string;
   url: string;
+  /** Full probe URL */
+  probeUrl: string;
   ok: boolean;
   ms: number;
+  status?: number;
   version?: string;
   error?: string;
+  layer?: string;
 }
 
-const HEALTH_PATHS: Partial<Record<ServiceKey, string | null>> = {
-  auth: "/login",
-  api: "/api/health",
-  account: "/api/health",
-  survival: "/api/healthz",
-  launcher: "/",
-  ai: "/health",
-  colyseus: "/api/health",
-  "game-servers": "/health",
-  "assets-api": "/health",
-  "assets-cdn": "/js/grudge-fleet.js",
-  "forge-api": "/api/healthz",
-  ws: "/api/health",
-};
+/** Up = 2xx/3xx, or 401/403 (service alive, auth required). 404/5xx = down or wrong path. */
+function statusMeansUp(status: number): boolean {
+  if (status >= 200 && status < 400) return true;
+  if (status === 401 || status === 403) return true;
+  return false;
+}
 
 export async function checkHealth(key: ServiceKey): Promise<HealthResult> {
-  const svc = SERVICES.find((s) => s.key === key)!;
-  const healthPath = HEALTH_PATHS[key];
-  const start = performance.now();
-  if (healthPath === null) {
-    return { key, name: svc.name, url: svc.url, ok: true, ms: 0 };
+  const svc = SERVICES.find((s) => s.key === key);
+  if (!svc) {
+    return {
+      key,
+      name: key,
+      url: "",
+      probeUrl: "",
+      ok: false,
+      ms: 0,
+      error: "Unknown service key",
+    };
   }
+  const origin = svc.url.replace(/\/$/, "");
+  const path = svc.healthPath.startsWith("/") ? svc.healthPath : `/${svc.healthPath}`;
+  const probeUrl = `${origin}${path}`;
+  const start = performance.now();
   try {
-    const path = healthPath ?? "/health";
-    const url = path.startsWith("http") ? path : `${svc.url.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
-    const r = await fetch(url, { method: "GET", signal: AbortSignal.timeout(8000) });
-    let body: any = {};
-    try { body = await r.json(); } catch {}
+    const r = await fetch(probeUrl, {
+      method: "GET",
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    let body: Record<string, unknown> = {};
+    const ct = r.headers.get("content-type") || "";
+    if (ct.includes("json")) {
+      try {
+        body = await r.json();
+      } catch {
+        /* ignore */
+      }
+    }
+    const ok = statusMeansUp(r.status);
     return {
       key,
       name: svc.name,
       url: svc.url,
-      ok: r.ok || (r.status >= 200 && r.status < 400),
+      probeUrl,
+      ok,
       ms: Math.round(performance.now() - start),
-      version: body?.version || body?.service,
+      status: r.status,
+      version: (body?.version as string) || (body?.service as string) || undefined,
+      layer: svc.layer,
+      error: ok ? undefined : `HTTP ${r.status}`,
     };
   } catch (e) {
-    return { key, name: svc.name, url: svc.url, ok: false, ms: Math.round(performance.now() - start), error: String(e) };
+    return {
+      key,
+      name: svc.name,
+      url: svc.url,
+      probeUrl,
+      ok: false,
+      ms: Math.round(performance.now() - start),
+      layer: svc.layer,
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
 }
 
@@ -109,18 +138,85 @@ export async function checkAllHealth(): Promise<HealthResult[]> {
   return Promise.all(SERVICES.map((s) => checkHealth(s.key)));
 }
 
-// ── Deployment status ───────────────────────────────────────────
-export interface DeployStatus { url: string; online: boolean; ms: number; }
+// ── Deployment status (game / product SPAs) ─────────────────────
+export interface DeployStatus {
+  url: string;
+  probeUrl: string;
+  online: boolean;
+  ms: number;
+  status?: number;
+  error?: string;
+  /** CORS blocked but network may still work — treat cautiously */
+  opaque?: boolean;
+}
 
-export async function checkDeployment(url: string): Promise<DeployStatus> {
-  if (!url) return { url, online: false, ms: 0 };
+/**
+ * Real GET probe. Do **not** use mode:no-cors as success — that always
+ * "succeeds" with an opaque response and lied about offline hosts.
+ */
+export async function checkDeployment(
+  url: string,
+  healthPath = "/",
+): Promise<DeployStatus> {
+  if (!url) return { url: "", probeUrl: "", online: false, ms: 0, error: "No URL" };
+  const origin = url.replace(/\/$/, "");
+  const path = healthPath.startsWith("http")
+    ? healthPath
+    : `${origin}${healthPath.startsWith("/") ? healthPath : `/${healthPath}`}`;
   const start = performance.now();
   try {
-    await fetch(url, { method: "HEAD", mode: "no-cors", signal: AbortSignal.timeout(8000) });
-    return { url, online: true, ms: Math.round(performance.now() - start) };
-  } catch {
-    return { url, online: false, ms: Math.round(performance.now() - start) };
+    const r = await fetch(path, {
+      method: "GET",
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    const online = statusMeansUp(r.status);
+    return {
+      url,
+      probeUrl: path,
+      online,
+      ms: Math.round(performance.now() - start),
+      status: r.status,
+      error: online ? undefined : `HTTP ${r.status}`,
+    };
+  } catch (e) {
+    // Last resort: no-cors only proves TCP/DNS, not HTTP health
+    try {
+      await fetch(path, {
+        method: "GET",
+        mode: "no-cors",
+        signal: AbortSignal.timeout(8_000),
+      });
+      return {
+        url,
+        probeUrl: path,
+        online: true,
+        ms: Math.round(performance.now() - start),
+        opaque: true,
+        status: 0,
+        error: "Opaque response (CORS) — host reachable, status unknown",
+      };
+    } catch {
+      return {
+        url,
+        probeUrl: path,
+        online: false,
+        ms: Math.round(performance.now() - start),
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
   }
+}
+
+export async function checkAllDeployments(): Promise<
+  Array<DeployStatus & { id: string; name: string }>
+> {
+  return Promise.all(
+    GAME_DEPLOYMENTS.map(async (d) => {
+      const st = await checkDeployment(d.liveUrl, d.healthPath);
+      return { ...st, id: d.id, name: d.name };
+    }),
+  );
 }
 
 // ════════════════════════════════════════════════════════════════

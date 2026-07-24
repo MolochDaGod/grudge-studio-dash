@@ -10,7 +10,20 @@ export default function Overview() {
 
   const deploys = useQuery({
     queryKey: ["deploys"],
-    queryFn: () => Promise.all(GRUDGE_APPS.map((p) => checkDeployment(p.liveUrl))),
+    queryFn: () =>
+      Promise.all(
+        GRUDGE_APPS.map((p) =>
+          p.liveUrl
+            ? checkDeployment(p.liveUrl, "/")
+            : Promise.resolve({
+                url: "",
+                probeUrl: "",
+                online: false,
+                ms: 0,
+                error: "No live URL",
+              }),
+        ),
+      ),
     refetchInterval: 60_000,
   });
 
