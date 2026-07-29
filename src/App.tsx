@@ -14,6 +14,7 @@ import GrudgeWars from "./pages/games/GrudgeWars";
 import Angeler from "./pages/games/Angeler";
 import GDevelop from "./pages/games/GDevelop";
 import Tools from "./pages/games/Tools";
+import NexusNemesis from "./pages/games/NexusNemesis";
 import Services from "./pages/Services";
 import Storage from "./pages/Storage";
 import AssetsPage from "./pages/Assets";
@@ -56,6 +57,8 @@ export default function App() {
             <Route path="/games/angeler" component={Angeler} />
             <Route path="/games/gdevelop" component={GDevelop} />
             <Route path="/games/tools" component={Tools} />
+            <Route path="/games/nexus-nemesis" component={NexusNemesis} />
+            <Route path="/shop/nexus" component={NexusNemesis} />
             <Route path="/lobbies" component={Lobbies} />
             <Route path="/arena" component={Arena} />
             <Route path="/battle" component={Battle} />

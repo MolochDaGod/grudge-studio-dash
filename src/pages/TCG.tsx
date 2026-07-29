@@ -13,7 +13,14 @@ export default function TCG() {
     <div>
       <TopBar title="TCG" />
 
-      <p className="text-sm text-muted-foreground mb-6">Grudge TCG tournament hosting and match management.</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        Grudge TCG lobbies ·{" "}
+        <a href="/games/nexus-nemesis" className="text-accent underline">Nexus Nemesis pack shop</a>
+        {" · "}
+        <a href="https://nemesis.grudge-studio.com/shop" target="_blank" rel="noreferrer" className="text-accent underline">
+          Live shop
+        </a>
+      </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard icon="🃏" value={tcgLobbies.length} label="TCG Lobbies" />

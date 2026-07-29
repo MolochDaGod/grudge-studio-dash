@@ -23,6 +23,7 @@ const NAV = [
       { href: "/games/warlords", label: "Warlords", icon: Swords },
       { href: "/games/carrier", label: "Carrier", icon: Gamepad2 },
       { href: "/games/grudox", label: "Grudox", icon: Crosshair },
+      { href: "/games/nexus-nemesis", label: "Nexus Nemesis", icon: Layers },
     ],
   },
   {
@@ -44,7 +45,8 @@ const NAV = [
       { href: "/battle", label: "Battle", icon: Crosshair },
       { href: "/mode-configs", label: "Game Modes", icon: Settings2 },
       { href: "/unity-servers", label: "Headless Servers", icon: Monitor },
-      { href: "/tcg", label: "TCG", icon: Layers },
+      { href: "/tcg", label: "TCG Lobbies", icon: Layers },
+      { href: "/shop/nexus", label: "Nexus Pack Shop", icon: Package },
     ],
   },
   {
