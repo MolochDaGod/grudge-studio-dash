@@ -194,6 +194,119 @@
           "role": "Colyseus realtime rooms"
         }
       ]
+    },
+    {
+      "id": "grudox",
+      "label": "Grudox / Survival / Nexus",
+      "liveUrl": "https://grudox.grudge-studio.com",
+      "connections": [
+        {
+          "engine": "json-api",
+          "url": "https://survival-api-production.up.railway.app",
+          "role": "Survival API SSOT — accounts, characters, masks, engine manifest",
+          "notes": "Separate Railway service from grudge-api"
+        },
+        {
+          "engine": "json-api",
+          "url": "https://grudge-api-production-0d46.up.railway.app",
+          "role": "Warlords characters for shipwreck / open-world handoff"
+        },
+        {
+          "engine": "json-api",
+          "url": "https://id.grudge-studio.com",
+          "role": "Grudge ID SSO"
+        },
+        {
+          "engine": "r2",
+          "url": "https://assets.grudge-studio.com",
+          "role": "Character GLBs / fleet JS"
+        }
+      ]
+    },
+    {
+      "id": "carrier-armada",
+      "label": "Carrier / Grim Armada",
+      "liveUrl": "https://armada.grudge-studio.com",
+      "connections": [
+        {
+          "engine": "json-api",
+          "url": "https://grudge-api-production-0d46.up.railway.app",
+          "role": "Shared Game API for accounts / progression"
+        },
+        {
+          "engine": "json-api",
+          "url": "https://id.grudge-studio.com",
+          "role": "Grudge ID auth"
+        }
+      ]
+    },
+    {
+      "id": "portal-engine",
+      "label": "Portal / The-ENGINE (Rec0deD)",
+      "liveUrl": "https://grudge-studio.com",
+      "connections": [
+        {
+          "engine": "json-api",
+          "url": "https://the-engine.up.railway.app",
+          "role": "Scores, challenges, GBUX, chat",
+          "notes": "grudge-studio.com /api/* rewrites here"
+        },
+        {
+          "engine": "json-api",
+          "url": "https://id.grudge-studio.com",
+          "role": "Grudge ID auth"
+        }
+      ]
+    },
+    {
+      "id": "studio-dash",
+      "label": "Studio Dashboard (this app)",
+      "liveUrl": "https://dash.grudge-studio.com",
+      "connections": [
+        {
+          "engine": "json-api",
+          "url": "https://grudge-api-production-0d46.up.railway.app",
+          "role": "Admin users, DB tables, economy, PvP"
+        },
+        {
+          "engine": "json-api",
+          "url": "https://id.grudge-studio.com",
+          "role": "Admin session / SSO"
+        },
+        {
+          "engine": "json-api",
+          "url": "https://survival-api-production.up.railway.app",
+          "role": "Grudox account/character cross-lookup"
+        },
+        {
+          "engine": "d1",
+          "d1Name": "grudge-assets-db",
+          "d1Id": "3eeadd9e-832d-4d2e-bb14-8ddf75b3ac59",
+          "role": "Asset registry index for Warlords Assets browser"
+        },
+        {
+          "engine": "json-api",
+          "url": "https://objectstore.grudge-studio.com",
+          "role": "Catalog / db-connections meta"
+        }
+      ]
+    },
+    {
+      "id": "game-data-hub",
+      "label": "Game Data Hub (master defs)",
+      "liveUrl": "https://grudge-game-data-hub.vercel.app",
+      "connections": [
+        {
+          "engine": "json-api",
+          "url": "https://objectstore.grudge-studio.com/api/v1",
+          "role": "Publish path for standardized items / crafting"
+        },
+        {
+          "engine": "r2",
+          "url": "https://assets.grudge-studio.com",
+          "role": "Linked binary assets by GRUDGE UUID"
+        }
+      ]
     }
   ]
 }

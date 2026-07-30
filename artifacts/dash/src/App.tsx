@@ -6,6 +6,7 @@ import { GrudgePanelProvider } from "./components/GrudgePanel";
 // Pages
 import Overview from "./pages/Overview";
 import Accounts from "./pages/Accounts";
+import Characters from "./pages/Characters";
 import UnityGame from "./pages/games/UnityGame";
 import Warlords from "./pages/games/Warlords";
 import Carrier from "./pages/games/Carrier";
@@ -14,6 +15,7 @@ import GrudgeWars from "./pages/games/GrudgeWars";
 import Angeler from "./pages/games/Angeler";
 import GDevelop from "./pages/games/GDevelop";
 import Tools from "./pages/games/Tools";
+import NexusNemesis from "./pages/games/NexusNemesis";
 import Services from "./pages/Services";
 import Storage from "./pages/Storage";
 import AssetsPage from "./pages/Assets";
@@ -48,6 +50,7 @@ export default function App() {
             <Route path="/auth/callback" component={Overview} />
             <Route path="/settings" component={Settings} />
             <Route path="/accounts" component={Accounts} />
+            <Route path="/characters" component={Characters} />
             <Route path="/games/warlords" component={Warlords} />
             <Route path="/games/carrier" component={Carrier} />
             <Route path="/games/grudox" component={Grudox} />
@@ -56,6 +59,8 @@ export default function App() {
             <Route path="/games/angeler" component={Angeler} />
             <Route path="/games/gdevelop" component={GDevelop} />
             <Route path="/games/tools" component={Tools} />
+            <Route path="/games/nexus-nemesis" component={NexusNemesis} />
+            <Route path="/shop/nexus" component={NexusNemesis} />
             <Route path="/lobbies" component={Lobbies} />
             <Route path="/arena" component={Arena} />
             <Route path="/battle" component={Battle} />

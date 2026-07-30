@@ -16,21 +16,24 @@
 
 ## Features
 
-### Studio
+### Studio (priority)
 - **Overview** — Ecosystem health, app registry, quick stats
-- **Settings / Accounts** — Grudge ID session, user management
+- **Accounts** — User directory, Grudge ID lookup, ban/role admin, sessions, audit, role map
+- **Characters** — Warlords list, cross-game Grudge ID roster (Game API + Survival/Grudox)
+- **Settings** — Brand, service health, db-connections manifest
+
+### Game Databases
+- **Databases** (`/database`) — Multi-game DB map (SSOT / cache / D1 / R2), Postgres tables, row browser, endpoint health
+- **Schema / SQL Query / Economy** — Railway Postgres admin tools
+- **Asset Registry** (`/asset-browser`) — D1 `asset_registry` + R2 CDN catalog
+- **Data SSOT Map** (`/assets`) — Topology (Railway · ObjectStore · R2 · D1 · Puter)
 
 ### Flagship & games
-- **Warlords / Carrier / Grudox** — Flagship launchers
+- **Warlords / Carrier / Grudox / Nexus** — Flagship launchers
 - **Unity / Grudge Wars / Angeler / App Manager / Builder** — Additional games & tools
 
-### PvP & lobbies
-- Lobby manager, Arena, Battle, game modes, headless Unity servers, TCG
-
-### Data
-- **Warlords Assets** (`/asset-browser`) — Full live catalog of D1 `asset_registry` (~6k R2 binaries). Search, filter by category/format/source set, CDN URLs, copy UUID/R2 key. Source: `GET https://api.grudge-studio.com/assets`
-- **Assets & SSOT** (`/assets`) — Topology map (Railway · ObjectStore · R2 · D1 registry · Puter)
-- **Tables / Schema / Query / Economy** — Railway Postgres admin
+### Live ops
+- Lobbies, Arena, Battle, game modes, headless Unity servers, TCG
 
 ### Infrastructure
 - Services, Railway fleet, Deploy, Object Storage (R2), Logs, Docs & maps

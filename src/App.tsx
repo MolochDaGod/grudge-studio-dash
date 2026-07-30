@@ -6,6 +6,7 @@ import { GrudgePanelProvider } from "./components/GrudgePanel";
 // Pages
 import Overview from "./pages/Overview";
 import Accounts from "./pages/Accounts";
+import Characters from "./pages/Characters";
 import UnityGame from "./pages/games/UnityGame";
 import Warlords from "./pages/games/Warlords";
 import Carrier from "./pages/games/Carrier";
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/auth/callback" component={Overview} />
             <Route path="/settings" component={Settings} />
             <Route path="/accounts" component={Accounts} />
+            <Route path="/characters" component={Characters} />
             <Route path="/games/warlords" component={Warlords} />
             <Route path="/games/carrier" component={Carrier} />
             <Route path="/games/grudox" component={Grudox} />

@@ -67,7 +67,17 @@ export default function Overview() {
           {health.data
             ? health.data.map((svc) => <ServiceCard key={svc.key} svc={svc} />)
             : SERVICES.map((s) => (
-                <ServiceCard key={s.key} svc={{ key: s.key, name: s.name, url: s.url, ok: false, ms: 0 }} />
+                <ServiceCard
+                  key={s.key}
+                  svc={{
+                    key: s.key,
+                    name: s.name,
+                    url: s.url,
+                    probeUrl: `${s.url}${s.healthPath}`,
+                    ok: false,
+                    ms: 0,
+                  }}
+                />
               ))}
         </div>
       </section>
