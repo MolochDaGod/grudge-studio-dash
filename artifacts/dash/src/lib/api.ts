@@ -323,9 +323,25 @@ interface EngineManifestRaw {
   updatedAt: string;
   controllers?: EngineControllerSummary[];
   cameras?: EngineCameraSummary[];
-  animationLibraries?: { id: string; label: string; rig: string; clipMap?: Record<string, string> }[];
+  animationLibraries?: {
+    id: string;
+    label: string;
+    rig: string;
+    clipMap?: Record<string, string>;
+    clips?: { name?: string; source?: string }[];
+  }[];
   pipeline?: { cdnBase: string; defaultCharacterHeightM: number };
   libraries?: Record<string, string | undefined>;
+}
+
+/** Playable clip count — never treat an empty alias map as "0 animations". */
+export function countEngineLibraryClips(lib: {
+  clipMap?: Record<string, string>;
+  clips?: { name?: string; source?: string }[];
+}): number {
+  const fromClips = (lib.clips ?? []).filter((c) => Boolean(c?.name || c?.source)).length;
+  const fromMapKeys = Object.keys(lib.clipMap ?? {}).length;
+  return Math.max(fromClips, fromMapKeys);
 }
 
 function normalizeEngineManifest(m: EngineManifestRaw): EngineManifestSummary {
@@ -340,7 +356,7 @@ function normalizeEngineManifest(m: EngineManifestRaw): EngineManifestSummary {
       id: lib.id,
       label: lib.label,
       rig: lib.rig,
-      clipCount: Object.keys(lib.clipMap ?? {}).length,
+      clipCount: countEngineLibraryClips(lib),
     })),
     pipeline: m.pipeline ?? { cdnBase: "", defaultCharacterHeightM: 1.8 },
     libraries: m.libraries ?? {},
