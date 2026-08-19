@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import TopBar from "../components/TopBar";
 import { StatCard } from "../components/Cards";
 import { adminApi, type Lobby, type LobbyStatus } from "../lib/api";
+import { API } from "../lib/config";
 import { XCircle, RefreshCw } from "lucide-react";
 
 const MODE_META: Record<string, { label: string; icon: string }> = {
@@ -42,6 +43,16 @@ export default function Lobbies() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-lobbies"] }),
   });
 
+  const pvpLive = useQuery({
+    queryKey: ["pvp-railway-lobby"],
+    queryFn: async () => {
+      const r = await fetch(`${API.pvp}/lobby`, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<{ ok: boolean; games: unknown[]; count: number }>;
+    },
+    refetchInterval: 15_000,
+  });
+
   const data = lobbies.data ?? [];
   const active    = data.filter((l) => l.status === "in_progress").length;
   const waiting   = data.filter((l) => l.status === "waiting" || l.status === "ready").length;
@@ -50,6 +61,26 @@ export default function Lobbies() {
   return (
     <div>
       <TopBar title="Lobby Manager" />
+
+      <div className="mb-4 rounded-lg border border-border px-4 py-3 text-sm flex flex-wrap items-center gap-3">
+        <span className={`w-2 h-2 rounded-full ${pvpLive.data?.ok ? "bg-green-400" : "bg-red-400"}`} />
+        <span>
+          Railway PvP lobby:{" "}
+          {pvpLive.isError
+            ? "unreachable"
+            : pvpLive.data
+              ? `${pvpLive.data.count} waiting games`
+              : "checking…"}
+        </span>
+        <a
+          href={`${API.pvp}/health`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary text-xs hover:underline"
+        >
+          {API.pvp}/health
+        </a>
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard icon="🏠" value={data.length} label="Total Lobbies" />

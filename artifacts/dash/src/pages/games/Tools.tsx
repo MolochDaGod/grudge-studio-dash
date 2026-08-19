@@ -5,9 +5,10 @@ import { checkDeployment } from "../../lib/api";
 import { Globe, GitBranch } from "lucide-react";
 
 const TOOLS = [
-  { name: "Grudge Builder", icon: "🏗️", url: "https://molochdagod.github.io/Grudge-Builder", repo: "MolochDaGod/Grudge-Builder", desc: "Character, item & world building tool" },
-  { name: "GrudgeStudioNPM", icon: "📦", url: "https://molochdagod.github.io/GrudgeStudioNPM", repo: "MolochDaGod/GrudgeStudioNPM", desc: "Shared npm package — grudge-studio on npm" },
-  { name: "Object Store", icon: "🗄️", url: "https://molochdagod.github.io/ObjectStore", repo: "MolochDaGod/ObjectStore", desc: "Object storage API library" },
+  { name: "Grudge Builder", icon: "🏗️", url: "https://grudgewarlords.com", repo: "MolochDaGod/Grudge-Builder", desc: "Production Warlords client — craft, island, play" },
+  { name: "Craft suite", icon: "⚒️", url: "https://grudgewarlords.com/craft/", repo: "MolochDaGod/Grudge-Builder", desc: "Production crafting — same-origin, not studio demo" },
+  { name: "2D Island", icon: "🗺️", url: "https://grudgewarlords.com/island", repo: "MolochDaGod/Grudge-Builder", desc: "Seeded 2D island generator" },
+  { name: "Object Store", icon: "🗄️", url: "https://objectstore.grudge-studio.com", repo: "MolochDaGod/ObjectStore", desc: "Canonical game defs JSON API" },
 ];
 
 export default function Tools() {

@@ -119,16 +119,16 @@
           "url": "https://rdbkhvrpavhptxrmmwrc.supabase.co",
           "projectId": "rdbkhvrpavhptxrmmwrc",
           "envVar": "SUPABASE_URL",
-          "role": "Supabase auth spine (Phase 1)",
-          "notes": "Publishable + secret keys in .env — never expose secret to browser"
+          "role": "LEGACY — not required. Grudge ID + Railway are SSOT. configured:false is healthy.",
+          "notes": "Do not enable for player data. Do not expose secret to browser."
         },
         {
           "envVar": "MYSQL_DATABASE",
           "engine": "mysql",
           "host": "74.208.155.229",
           "database": "grudge_game",
-          "role": "Legacy VPS MySQL game tables",
-          "notes": "Parallel to Postgres — audit which tables live where"
+          "role": "LEGACY VPS MySQL — retired for game SSOT",
+          "notes": "Do not write. Railway Postgres is authoritative."
         },
         {
           "engine": "d1",

@@ -3,7 +3,9 @@ import TopBar from "../components/TopBar";
 import { ServiceCard, StatCard, ProjectCard } from "../components/Cards";
 import { checkAllHealth, checkDeployment, adminApi, accountApi } from "../lib/api";
 import { GRUDGE_APPS, SERVICES } from "../lib/config";
+import { RAILWAY_FLEET } from "../lib/railwayFleet";
 import { Users, Swords, Package, Activity } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Overview() {
   const health = useQuery({ queryKey: ["health"], queryFn: checkAllHealth, refetchInterval: 30_000 });
@@ -40,10 +42,27 @@ export default function Overview() {
   const onlineApps     = deploys.data?.filter((d) => d.online).length ?? 0;
   const totalAccounts  = stats?.totalUsers ?? "—";
   const active24h      = stats?.activeUsers24h ?? "—";
+  const railAlarms = RAILWAY_FLEET.filter((e) =>
+    ["failing", "misdeployed", "phantom"].includes(e.status),
+  );
 
   return (
     <div>
       <TopBar title="Studio Overview" />
+
+      {railAlarms.length > 0 && (
+        <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm">
+          <strong className="text-danger">{railAlarms.length} unresolved Railway alarms</strong>
+          <span className="text-muted-foreground">
+            {" "}
+            — phantom monorepo services, misdeployed Streamlit, and failing legacy builder. They are
+            not the modern SSOT.
+          </span>
+          <Link href="/deploy" className="ml-2 text-primary hover:underline">
+            Open deploy board
+          </Link>
+        </div>
+      )}
 
       {/* Top row: infra health */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">

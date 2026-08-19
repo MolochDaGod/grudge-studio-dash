@@ -1,89 +1,153 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+/**
+ * Deploy — modern public health board.
+ * The old Docker /admin/containers VPS API is retired. This page probes
+ * Railway + Vercel + CDN the same way production clients do.
+ */
+import { useQuery } from "@tanstack/react-query";
 import TopBar from "../components/TopBar";
-import { StatCard, DataTable } from "../components/Cards";
-import { deployApi } from "../lib/api";
-import { RefreshCw, Hammer, ScrollText } from "lucide-react";
-import { useState } from "react";
+import { StatCard } from "../components/Cards";
+import { checkAllDeployments, checkAllHealth } from "../lib/api";
+import {
+  RAILWAY_FLEET,
+  RAILWAY_STATUS_LABEL,
+  probeRailwayFleet,
+} from "../lib/railwayFleet";
+import { RefreshCw, ExternalLink } from "lucide-react";
 
 export default function Deploy() {
-  const qc = useQueryClient();
-  const containers = useQuery({ queryKey: ["containers"], queryFn: deployApi.containers, refetchInterval: 15_000 });
-  const history = useQuery({ queryKey: ["deploy-history"], queryFn: () => deployApi.history() });
-  const [logsId, setLogsId] = useState<string | null>(null);
-  const logs = useQuery({ queryKey: ["deploy-logs", logsId], queryFn: () => deployApi.logs(logsId!), enabled: !!logsId });
+  const health = useQuery({
+    queryKey: ["health", "deploy-page"],
+    queryFn: checkAllHealth,
+    refetchInterval: 30_000,
+  });
+  const deploys = useQuery({
+    queryKey: ["game-deploys", "deploy-page"],
+    queryFn: checkAllDeployments,
+    refetchInterval: 45_000,
+  });
+  const railway = useQuery({
+    queryKey: ["railway-fleet-probes", "deploy-page"],
+    queryFn: probeRailwayFleet,
+    refetchInterval: 60_000,
+  });
 
-  const restartMut = useMutation({ mutationFn: deployApi.restart, onSuccess: () => qc.invalidateQueries({ queryKey: ["containers"] }) });
-  const rebuildMut = useMutation({ mutationFn: deployApi.rebuild, onSuccess: () => qc.invalidateQueries({ queryKey: ["containers"] }) });
+  const backendsUp = health.data?.filter((s) => s.ok).length ?? 0;
+  const backends = health.data?.length ?? 0;
+  const gamesUp = deploys.data?.filter((d) => d.online).length ?? 0;
+  const games = deploys.data?.length ?? 0;
+  const railOk = railway.data?.filter((p) => p.ok).length ?? 0;
+  const railN = railway.data?.length ?? 0;
+  const alarms = RAILWAY_FLEET.filter((e) =>
+    ["failing", "misdeployed", "phantom"].includes(e.status),
+  );
+  const fetching = health.isFetching || deploys.isFetching || railway.isFetching;
 
-  const running = containers.data?.filter((c: any) => c.status === "running").length ?? 0;
-  const stopped = (containers.data?.length ?? 0) - running;
+  const refresh = () => {
+    void health.refetch();
+    void deploys.refetch();
+    void railway.refetch();
+  };
 
   return (
     <div>
-      <TopBar title="Server & Deploy" />
+      <TopBar title="Deploy & health" />
 
-      <p className="text-sm text-muted-foreground mb-6">Docker container management — restart, rebuild, and view logs for all Grudge services.</p>
+      <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
+        Live public probes for the modern stack: Railway Postgres + Colyseus, PvP lobby,
+        ObjectStore, R2, Grudge ID. The old VPS Docker container API is retired — it is
+        not how production ships.
+      </p>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard icon="📦" value={containers.data?.length ?? "—"} label="Containers" />
-        <StatCard icon="✅" value={running} label="Running" />
-        <StatCard icon="⛔" value={stopped} label="Stopped" />
-        <StatCard icon="📋" value={history.data?.length ?? "—"} label="Deploys" />
+      <div className="flex justify-end mb-3">
+        <button
+          type="button"
+          onClick={refresh}
+          className="gilded-button flex items-center gap-1 px-3 py-1 text-xs"
+          disabled={fetching}
+        >
+          <RefreshCw size={12} className={fetching ? "animate-spin" : ""} /> Refresh
+        </button>
       </div>
 
-      <section className="mb-6">
-        <h2 className="text-lg mb-3">Containers</h2>
-        {containers.isError && <div className="inset-panel p-4 text-sm text-danger mb-4">Deploy API not connected — add /api/deploy endpoints.</div>}
-        {containers.data && (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon="🖥️" value={`${backendsUp}/${backends}`} label="Backends up" />
+        <StatCard icon="🎮" value={`${gamesUp}/${games}`} label="Game shells up" />
+        <StatCard icon="🚂" value={`${railOk}/${railN}`} label="Railway probes" />
+        <StatCard icon="🚨" value={alarms.length} label="Legacy alarms" />
+      </div>
+
+      {alarms.length > 0 && (
+        <section className="mb-6 fantasy-panel p-4 border border-danger/40">
+          <h2 className="text-lg mb-2 text-danger">Unresolved legacy / phantom Railway</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            These still exist on the Railway account and generate failed builds. They are
+            not part of the modern SSOT. Delete or unlink — do not route players here.
+          </p>
           <div className="space-y-2">
-            {containers.data.map((c: any) => (
-              <div key={c.id} className="fantasy-panel p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className={`w-2 h-2 rounded-full ${c.status === "running" ? "bg-green-400" : "bg-red-400"}`} />
-                  <div>
-                    <span className="text-sm font-medium">{c.name ?? c.id}</span>
-                    {c.image && <span className="ml-2 text-xs text-muted-foreground">{c.image}</span>}
-                    {c.ports && <span className="ml-2 text-xs text-muted-foreground">:{c.ports}</span>}
-                  </div>
+            {alarms.map((e) => (
+              <div key={e.id} className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                <div>
+                  <span className="font-medium">{e.project}</span>
+                  <span className="text-muted-foreground"> / {e.service}</span>
+                  <span className="ml-2 text-[10px] uppercase text-danger">
+                    {RAILWAY_STATUS_LABEL[e.status]}
+                  </span>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setLogsId(c.id)} className="gilded-button flex items-center gap-1 px-2 py-1 text-xs"><ScrollText size={12} /> Logs</button>
-                  <button onClick={() => restartMut.mutate(c.id)} disabled={restartMut.isPending} className="gilded-button flex items-center gap-1 px-2 py-1 text-xs"><RefreshCw size={12} /> Restart</button>
-                  <button onClick={() => rebuildMut.mutate(c.id)} disabled={rebuildMut.isPending} className="gilded-button flex items-center gap-1 px-2 py-1 text-xs"><Hammer size={12} /> Rebuild</button>
-                </div>
+                <span className="text-xs text-muted-foreground">{e.action}</span>
               </div>
             ))}
           </div>
-        )}
-      </section>
-
-      {/* Logs viewer */}
-      {logsId && (
-        <section className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="text-lg">Logs — {logsId}</h2>
-            <button onClick={() => setLogsId(null)} className="text-xs text-muted-foreground hover:text-foreground">Close</button>
-          </div>
-          <pre className="inset-panel p-4 text-xs text-foreground/80 max-h-80 overflow-auto whitespace-pre-wrap font-mono">
-            {logs.isLoading ? "Loading..." : logs.data ?? "No logs available."}
-          </pre>
         </section>
       )}
 
+      <section className="mb-6">
+        <h2 className="text-lg mb-3">Backend probes</h2>
+        <div className="space-y-1">
+          {(health.data ?? []).map((s) => (
+            <div
+              key={s.key}
+              className="flex items-center justify-between gap-3 px-3 py-2 rounded border border-border/60"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`w-2 h-2 rounded-full ${s.ok ? "bg-green-400" : "bg-red-400"}`} />
+                <span className="text-sm font-medium">{s.name}</span>
+                <span className="text-[10px] uppercase text-muted-foreground">{s.layer}</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground shrink-0">
+                <span>{s.status ?? "—"}</span>
+                <span>{s.ms}ms</span>
+                {s.error && <span className="text-danger max-w-[180px] truncate">{s.error}</span>}
+                <a href={s.probeUrl} target="_blank" rel="noopener noreferrer" className="text-primary inline-flex items-center gap-1">
+                  open <ExternalLink size={10} />
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section>
-        <h2 className="text-lg mb-3">Deploy History</h2>
-        {history.data ? (
-          <DataTable
-            columns={[
-              { key: "id", label: "Deploy ID" }, { key: "service", label: "Service" }, { key: "action", label: "Action" },
-              { key: "status", label: "Status" }, { key: "triggered_by", label: "By" }, { key: "created_at", label: "Time" },
-            ]}
-            rows={history.data}
-            emptyMsg="No deploy history"
-          />
-        ) : (
-          <div className="inset-panel p-4 text-sm text-muted-foreground">No deploy history available.</div>
-        )}
+        <h2 className="text-lg mb-3">Player-facing shells</h2>
+        <div className="space-y-1">
+          {(deploys.data ?? []).map((d) => (
+            <div
+              key={d.id ?? d.url}
+              className="flex items-center justify-between gap-3 px-3 py-2 rounded border border-border/60"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`w-2 h-2 rounded-full ${d.online ? "bg-green-400" : "bg-red-400"}`} />
+                <span className="text-sm font-medium truncate">{d.name ?? d.url.replace(/^https?:\/\//, "")}</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
+                <span>{d.status ?? "—"}</span>
+                <span>{d.ms}ms</span>
+                <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-primary inline-flex items-center gap-1">
+                  open <ExternalLink size={10} />
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );

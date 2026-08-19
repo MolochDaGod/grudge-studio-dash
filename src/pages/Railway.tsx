@@ -43,7 +43,8 @@ export default function Railway() {
         Inventory of Railway projects tied to Grudge Studio. Most build-failure spam comes from{" "}
         <strong className="text-foreground">phantom monorepo services</strong> and{" "}
         <strong className="text-foreground">grudge-warlords-db</strong> linked to the wrong directory.
-        Only <code className="text-primary text-xs">survival-api-production</code> should serve the Nexus API.
+        Canonical Warlords API is <code className="text-primary text-xs">grudge-api-production-0d46</code>.
+        Only <code className="text-primary text-xs">survival-api-production</code> should serve Nexus.
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

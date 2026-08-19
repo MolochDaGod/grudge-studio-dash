@@ -16,6 +16,9 @@ export const API = {
     import.meta.env.VITE_GAME_SERVERS_URL || "https://grudge-game-servers.grudge.workers.dev",
   assetsApi: "https://objectstore.grudge-studio.com",
   assetsCdn: "https://assets.grudge-studio.com",
+  pvp: "https://grudge-pvp-server-production.up.railway.app",
+  wallet: "https://wallet.grudge-studio.com",
+  info: "https://info.grudge-studio.com",
 } as const;
 
 /** Role hierarchy — mirrors grudge-backend/server/auth.ts ROLE_LEVELS */
@@ -103,11 +106,14 @@ export type ServiceKey =
   | "launcher"
   | "ai"
   | "colyseus"
+  | "pvp"
   | "game-servers"
   | "assets-api"
   | "assets-cdn"
   | "forge"
-  | "open-api";
+  | "open-api"
+  | "wallet"
+  | "info";
 
 export interface ServiceDef {
   key: ServiceKey;
@@ -127,10 +133,10 @@ export const SERVICES: ServiceDef[] = [
     key: "auth",
     name: "Grudge ID",
     url: API.auth,
-    healthPath: "/login",
+    healthPath: "/api/health",
     layer: "identity",
     description: "SSO gateway — JWT mint, OAuth, brand login",
-    notes: "Canonical login host. Never use dead api.grudge-studio.com for auth.",
+    notes: "Canonical login host. Never use dead api.grudge-studio.com for auth. Probe /api/health, not /login HTML.",
   },
   {
     key: "api",
@@ -172,10 +178,35 @@ export const SERVICES: ServiceDef[] = [
     key: "colyseus",
     name: "Realtime (Colyseus / WS)",
     url: API.colyseus,
-    healthPath: "/api/health",
+    healthPath: "/api/colyseus/health",
     layer: "realtime",
     description: "Authoritative rooms on grudge-api Railway process",
-    notes: "Same host as Game API; WS upgrade not available on Vercel alone.",
+    notes: "Same host as Game API. /api/colyseus/health → matchMakerReady.",
+  },
+  {
+    key: "pvp",
+    name: "PvP lobby (Railway)",
+    url: API.pvp,
+    healthPath: "/health",
+    layer: "realtime",
+    description: "Socket.io 1v1 lobby — rooms, pick, ready, input relay",
+    notes: "Repaired Aug 2026. Not Colyseus. world.grudge-studio.com is dead — do not use.",
+  },
+  {
+    key: "wallet",
+    name: "Wallet",
+    url: API.wallet,
+    healthPath: "/",
+    layer: "identity",
+    description: "wallet.grudge-studio.com — Grudge ID wallet shell",
+  },
+  {
+    key: "info",
+    name: "Info / guide",
+    url: API.info,
+    healthPath: "/grudge-guide.html",
+    layer: "tools",
+    description: "info.grudge-studio.com — Warlords guide + public docs",
   },
   {
     key: "game-servers",
@@ -360,6 +391,30 @@ export const GAME_DEPLOYMENTS: GameDeployment[] = [
     description: "Tactical carrier combat",
   },
   {
+    id: "craft",
+    name: "Warlords Craft",
+    icon: "⚒️",
+    liveUrl: "https://grudgewarlords.com/craft/",
+    healthPath: "/",
+    backends: ["auth", "api", "assets-api", "assets-cdn"],
+    repo: "MolochDaGod/Grudge-Builder",
+    dashPath: "/games/warlords",
+    tier: "flagship",
+    description: "Production craft suite — same-origin, not ui.grudge-studio.com",
+  },
+  {
+    id: "island",
+    name: "2D Home Island",
+    icon: "🗺️",
+    liveUrl: "https://grudgewarlords.com/island",
+    healthPath: "/",
+    backends: ["auth", "api", "assets-cdn"],
+    repo: "MolochDaGod/Grudge-Builder",
+    dashPath: "/games/warlords",
+    tier: "flagship",
+    description: "Seeded 2D island generator — /island?characterId=",
+  },
+  {
     id: "water",
     name: "Water / home island",
     icon: "🌊",
@@ -489,7 +544,7 @@ export const GRUDGE_APPS: GrudgeApp[] = [
     name: "Grudge Builder",
     description: "Character, item & world building tool",
     category: "editor",
-    liveUrl: "https://molochdagod.github.io/Grudge-Builder",
+    liveUrl: "https://grudgewarlords.com",
     repo: "MolochDaGod/Grudge-Builder",
     icon: "🏗️",
     embeddable: true,
@@ -500,7 +555,7 @@ export const GRUDGE_APPS: GrudgeApp[] = [
     name: "Warlord Crafting Suite",
     description: "Crafting system UI — recipes, materials, progression",
     category: "editor",
-    liveUrl: "https://warlord-crafting-suite.vercel.app",
+    liveUrl: "https://grudgewarlords.com/craft/",
     repo: "MolochDaGod/Warlord-Crafting-Suite",
     icon: "⚒️",
     embeddable: true,
@@ -512,7 +567,7 @@ export const GRUDGE_APPS: GrudgeApp[] = [
     name: "ObjectStore",
     description: "Public game data API — weapons, materials, armor, icons",
     category: "tool",
-    liveUrl: "https://molochdagod.github.io/ObjectStore",
+    liveUrl: "https://objectstore.grudge-studio.com",
     repo: "MolochDaGod/ObjectStore",
     icon: "📦",
     embeddable: true,
@@ -523,7 +578,7 @@ export const GRUDGE_APPS: GrudgeApp[] = [
     name: "GrudgeStudioNPM",
     description: "Shared npm package & tools for Grudge ecosystem",
     category: "tool",
-    liveUrl: "https://molochdagod.github.io/GrudgeStudioNPM",
+    liveUrl: "https://www.npmjs.com/package/grudge-studio",
     repo: "MolochDaGod/GrudgeStudioNPM",
     icon: "📚",
     embeddable: true,

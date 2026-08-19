@@ -118,12 +118,46 @@ export default function Docs() {
       <TopBar title="Docs & System Maps" />
 
       <p className="text-sm text-muted-foreground mb-6">
-        Internal reference for the Grudge Studio infrastructure. This page is auto-maintained in the dashboard codebase.
+        Modern stack first. The VPS Docker maps below are <strong>retired</strong> — kept so
+        operators can recognize leftover DNS. Do not deploy or send players there.
       </p>
+
+      <section className="mb-8">
+        <h2 className="text-lg mb-3">Modern SSOT (use these)</h2>
+        <div className="inset-panel overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Role</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Host</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary font-bold">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Identity", "id.grudge-studio.com", "Grudge ID JWT — never api.grudge-studio.com"],
+                ["Game state", "grudge-api-production-0d46.up.railway.app", "Postgres characters, bag, islands, wallet"],
+                ["Colyseus", "same Railway process /api/colyseus/health", "Rooms: lobby, sector, world, home_island, dungeon"],
+                ["PvP lobby", "grudge-pvp-server-production.up.railway.app", "Socket.io 1v1 — /health /lobby"],
+                ["Defs JSON", "objectstore.grudge-studio.com", "Recipes, items, professions"],
+                ["Binaries", "assets.grudge-studio.com", "R2 GLB / icons / fleet JS"],
+                ["Craft / island", "grudgewarlords.com/craft and /island", "Production client — not github.io or ui.grudge-studio.com"],
+                ["Portal API", "the-engine.up.railway.app", "Scores, Treaty chat, Rec0deD"],
+              ].map(([role, host, notes]) => (
+                <tr key={role} className="border-b border-border/50">
+                  <td className="px-3 py-1.5 font-medium">{role}</td>
+                  <td className="px-3 py-1.5"><code className="text-primary text-xs">{host}</code></td>
+                  <td className="px-3 py-1.5 text-muted-foreground text-xs">{notes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {/* Service Map */}
       <section className="mb-8">
-        <h2 className="text-lg mb-3">VPS1 Services ({VPS_IP})</h2>
+        <h2 className="text-lg mb-3">Retired VPS1 map ({VPS_IP}) — do not deploy</h2>
         <div className="inset-panel overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -150,7 +184,7 @@ export default function Docs() {
 
       {/* Windows VPS Colyseus */}
       <section className="mb-8">
-        <h2 className="text-lg mb-3">VPS2 Colyseus ({VPS2_IP})</h2>
+        <h2 className="text-lg mb-3">Retired VPS2 Colyseus ({VPS2_IP}) — use Railway</h2>
         <div className="inset-panel overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
