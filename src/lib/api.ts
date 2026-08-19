@@ -1,4 +1,22 @@
-import { API, SERVICES, GAME_DEPLOYMENTS, type ServiceKey } from "./config";
+import { API, GAME_API_BASE, SERVICES, GAME_DEPLOYMENTS, type ServiceKey } from "./config";
+
+/** Railway routes live under /api/*. Dash Vercel rewrites same-origin /api → Railway. */
+function railwayUrl(path: string): string {
+  let p = path.startsWith("/") ? path : `/${path}`;
+  if (!p.startsWith("/api/")) p = `/api${p}`;
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname.toLowerCase();
+    if (
+      h === "dash.grudge-studio.com" ||
+      h.endsWith(".grudge-studio.com") ||
+      h === "localhost" ||
+      h === "127.0.0.1"
+    ) {
+      return p;
+    }
+  }
+  return `${String(GAME_API_BASE).replace(/\/$/, "")}${p}`;
+}
 
 // ── Auth token accessor ─────────────────────────────────────────
 function getToken(): string | null {
@@ -386,15 +404,15 @@ export const economyApi = {
 export const accountApi = {
   list: (q?: string, page = 1, limit = 50) =>
     fetcher<{ success: boolean; users: AdminUserRow[]; pagination: { total: number; page: number; limit: number } }>(
-      `${API.api}/admin/users?page=${page}&limit=${limit}${q ? `&search=${encodeURIComponent(q)}` : ""}`,
+      `${railwayUrl("/admin/users")}?page=${page}&limit=${limit}${q ? `&search=${encodeURIComponent(q)}` : ""}`,
     ),
   byId: (userId: string | number) =>
     fetcher<{ success: boolean; user: AdminUserRow; characters: any[]; wallets: any[]; arenaStats: any }>(
-      `${API.api}/admin/users/${userId}`,
+      railwayUrl(`/admin/users/${userId}`),
     ),
   profileByGrudgeId: async (grudgeId: string): Promise<AccountProfile> => {
     const listed = await safeFetcher<{ users: AdminUserRow[] }>(
-      `${API.api}/admin/users?search=${encodeURIComponent(grudgeId)}&limit=1`,
+      `${railwayUrl("/admin/users")}?search=${encodeURIComponent(grudgeId)}&limit=1`,
     );
     const row = listed?.users?.[0];
     const survivalAcct = await survivalApi.account(grudgeId);
@@ -408,7 +426,7 @@ export const accountApi = {
     }
 
     const detail = await safeFetcher<{ user: AdminUserRow; characters: any[]; wallets: any[]; arenaStats: any }>(
-      `${API.api}/admin/users/${row.id}`,
+      railwayUrl(`/admin/users/${row.id}`),
     );
     const user = detail?.user;
     return {
@@ -427,16 +445,16 @@ export const accountApi = {
       survival: survivalBlock,
     };
   },
-  sessions: () => safeFetcher<any[]>(`${API.api}/admin/accounts/sessions`).then((r) => r ?? []),
-  auditLog: () => safeFetcher<any[]>(`${API.api}/admin/accounts/audit-log`).then((r) => r ?? []),
-  identityStats: () => safeFetcher<AdminStats>(`${API.api}/admin/stats`),
+  sessions: () => safeFetcher<any[]>(railwayUrl("/admin/accounts/sessions")).then((r) => r ?? []),
+  auditLog: () => safeFetcher<any[]>(railwayUrl("/admin/accounts/audit-log")).then((r) => r ?? []),
+  identityStats: () => safeFetcher<AdminStats>(railwayUrl("/admin/stats")),
   banUser: (userId: string | number, banned: boolean, reason?: string) =>
-    fetcher<any>(`${API.api}/admin/users/${userId}/ban`, {
+    fetcher<any>(railwayUrl(`/admin/users/${userId}/ban`), {
       method: "POST",
       body: JSON.stringify({ banned, reason }),
     }),
   setRole: (userId: string | number, role: string) =>
-    fetcher<any>(`${API.api}/admin/users/${userId}/role`, {
+    fetcher<any>(railwayUrl(`/admin/users/${userId}/role`), {
       method: "PATCH",
       body: JSON.stringify({ role }),
     }),
@@ -452,7 +470,7 @@ export const adminApi = {
   dbSchema:       (table: string) => fetcher<any[]>(`${API.api}/admin/db/schema/${table}`),
   dbQuery:        (sql: string) => fetcher<any>(`${API.api}/admin/db/query`, { method: "POST", body: JSON.stringify({ sql }) }),
   // game stats: characters, matches, lobbies, gold, redis keys
-  gameStats:      () => safeFetcher<AdminStats>(`${API.api}/admin/stats`),
+  gameStats:      () => safeFetcher<AdminStats>(railwayUrl("/admin/stats")),
   containers:      () => safeFetcher<any[]>(`${API.api}/admin/containers`),
   containerRestart:(id: string) => fetcher<any>(`${API.api}/admin/containers/${id}/restart`, { method: "POST" }),
   containerLogs:  (id: string, lines = 100) => fetcher<any>(`${API.api}/admin/containers/${id}/logs?lines=${lines}`),
