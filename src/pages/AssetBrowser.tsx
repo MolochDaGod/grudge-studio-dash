@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+/**
+ * /asset-browser — Full Grudge Warlords asset catalog
+ *
+ * Loads every row from D1 asset_registry (api.grudge-studio.com/assets)
+ * and lets you search / filter / open CDN URLs. SSOT binaries stay on
+ * assets.grudge-studio.com — this page never invents mesh paths.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Search,
@@ -13,8 +20,6 @@ import {
   X,
   Loader2,
   Filter,
-  Play,
-  Pause,
 } from "lucide-react";
 import { Link } from "wouter";
 import TopBar from "../components/TopBar";
@@ -36,9 +41,6 @@ import {
   sortedKeys,
   extFromKey,
 } from "../lib/assetRegistry";
-import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const PAGE = 48;
 
@@ -108,182 +110,6 @@ function AssetThumb({ asset }: { asset: RegistryAsset }) {
   );
 }
 
-function ModelViewer({ url }: { url: string }) {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const [clips, setClips] = useState<THREE.AnimationClip[]>([]);
-  const [activeClip, setActiveClip] = useState<string | null>(null);
-  const [playing, setPlaying] = useState(true);
-  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const actionRef = useRef<THREE.AnimationAction | null>(null);
-  const clockRef = useRef(new THREE.Clock());
-
-  useEffect(() => {
-    if (!mountRef.current) return;
-
-    const width = mountRef.current.clientWidth;
-    const height = 384;
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a1e);
-    scene.fog = new THREE.Fog(0x1a1a1e, 10, 50);
-
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(2, 1.5, 3);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    mountRef.current.appendChild(renderer.domElement);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.target.set(0, 0.8, 0);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambient);
-    const dir = new THREE.DirectionalLight(0xffffff, 1.2);
-    dir.position.set(5, 8, 5);
-    dir.castShadow = true;
-    scene.add(dir);
-    const fill = new THREE.DirectionalLight(0x88aaff, 0.4);
-    fill.position.set(-5, 3, -5);
-    scene.add(fill);
-
-    const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(8, 32),
-      new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.8 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
-    const grid = new THREE.GridHelper(8, 16, 0x444450, 0x333340);
-    grid.position.y = 0.01;
-    scene.add(grid);
-
-    const loader = new GLTFLoader();
-    let mixer: THREE.AnimationMixer | null = null;
-
-    loader.load(
-      url,
-      (gltf) => {
-        const model = gltf.scene;
-        model.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 1.8 / maxDim;
-        model.scale.setScalar(scale);
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.sub(center.multiplyScalar(scale));
-        model.position.y = 0;
-
-        scene.add(model);
-
-        if (gltf.animations?.length) {
-          mixer = new THREE.AnimationMixer(model);
-          mixerRef.current = mixer;
-          setClips(gltf.animations);
-          setActiveClip(gltf.animations[0].name);
-          const action = mixer.clipAction(gltf.animations[0]);
-          action.play();
-          actionRef.current = action;
-        }
-      },
-      undefined,
-      (err) => console.error("GLB load failed:", err)
-    );
-
-    let animId: number;
-    const animate = () => {
-      animId = requestAnimationFrame(animate);
-      const dt = Math.min(clockRef.current.getDelta(), 0.05);
-      controls.update();
-      if (mixer) mixer.update(dt);
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    const onResize = () => {
-      if (!mountRef.current) return;
-      const w = mountRef.current.clientWidth;
-      camera.aspect = w / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, height);
-    };
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener("resize", onResize);
-      controls.dispose();
-      renderer.dispose();
-      if (mountRef.current?.contains(renderer.domElement)) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      mixer?.stopAllAction();
-    };
-  }, [url]);
-
-  useEffect(() => {
-    const mixer = mixerRef.current;
-    if (!mixer || !activeClip || !clips.length) return;
-    const clip = clips.find((c) => c.name === activeClip);
-    if (!clip) return;
-    const prev = actionRef.current;
-    const next = mixer.clipAction(clip);
-    if (prev && prev !== next) {
-      prev.crossFadeTo(next, 0.2, true);
-    }
-    next.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();
-    actionRef.current = next;
-    if (!playing) next.paused = true;
-  }, [activeClip, clips, playing]);
-
-  useEffect(() => {
-    if (actionRef.current) actionRef.current.paused = !playing;
-  }, [playing]);
-
-  return (
-    <div className="space-y-2">
-      <div ref={mountRef} className="w-full h-96 rounded border border-border bg-obsidian/80 overflow-hidden" />
-      {clips.length > 0 && (
-        <div className="flex items-center gap-2 text-xs">
-          <button
-            type="button"
-            onClick={() => setPlaying((p) => !p)}
-            className="p-1.5 rounded border border-border hover:border-primary"
-          >
-            {playing ? <Pause size={14} /> : <Play size={14} />}
-          </button>
-          <select
-            value={activeClip || ""}
-            onChange={(e) => setActiveClip(e.target.value)}
-            className="flex-1 px-2 py-1 text-xs rounded border border-border bg-obsidian/50"
-          >
-            {clips.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name} ({c.duration.toFixed(2)}s)
-              </option>
-            ))}
-          </select>
-          <span className="text-muted-foreground">{clips.length} clips</span>
-        </div>
-      )}
-      {clips.length === 0 && (
-        <p className="text-[0.65rem] text-muted-foreground">Static model — no animation clips in this GLB.</p>
-      )}
-    </div>
-  );
-}
-
 function DetailDrawer({
   asset,
   onClose,
@@ -293,7 +119,6 @@ function DetailDrawer({
 }) {
   if (!asset) return null;
   const url = cdnUrlFor(asset);
-  const isModel = isModelAsset(asset);
 
   return (
     <div className="fixed inset-0 z-[80] flex justify-end">
@@ -303,7 +128,7 @@ function DetailDrawer({
         aria-label="Close"
         onClick={onClose}
       />
-      <aside className={`relative w-full ${isModel ? "max-w-3xl" : "max-w-md"} fantasy-panel h-full overflow-y-auto border-l-2 border-primary/40 p-5 shadow-2xl`}>
+      <aside className="relative w-full max-w-md fantasy-panel h-full overflow-y-auto border-l-2 border-primary/40 p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <p className="text-[0.6rem] uppercase tracking-widest text-primary mb-1">
@@ -320,15 +145,11 @@ function DetailDrawer({
           </button>
         </div>
 
-        {isModel ? (
-          <ModelViewer url={url} />
-        ) : (
-          <div className="aspect-square rounded border border-border bg-obsidian/60 mb-4 overflow-hidden">
-            <AssetThumb asset={asset} />
-          </div>
-        )}
+        <div className="aspect-square rounded border border-border bg-obsidian/60 mb-4 overflow-hidden">
+          <AssetThumb asset={asset} />
+        </div>
 
-        <dl className="space-y-3 text-xs mt-4">
+        <dl className="space-y-3 text-xs">
           <div>
             <dt className="text-muted-foreground uppercase tracking-wider text-[0.6rem] mb-0.5">CDN URL</dt>
             <dd className="font-mono break-all text-primary/90">{url}</dd>
@@ -385,11 +206,10 @@ function DetailDrawer({
           </div>
         </dl>
 
-        <div className="mt-6 p-3 rounded border border-primary/30 bg-primary/5 text-[0.65rem] text-muted-foreground leading-relaxed">
-          <p className="font-semibold text-primary mb-1">Canonical workflow</p>
-          <p>Binaries on R2 CDN · Definitions on ObjectStore · Index in D1. Models and animations load only from this registry. Play path: one AnimationMixer per character root, in-place clips, Rapier CCT owns translation. Do not ship Mixamo FBX at runtime.</p>
-          <p className="mt-1">Related: <a href="https://objectstore.grudge-studio.com/api/v1/" target="_blank" rel="noreferrer" className="text-primary hover:underline">ObjectStore defs</a> · <a href="https://info.grudge-studio.com/3D_MODELS.html" target="_blank" rel="noreferrer" className="text-primary hover:underline">Public 3D browser</a></p>
-        </div>
+        <p className="mt-6 text-[0.65rem] text-muted-foreground leading-relaxed">
+          Canonical Warlords meshes come from this registry + R2 CDN only. Do not substitute Meshy/AI
+          heroes or capsule placeholders in production loaders.
+        </p>
       </aside>
     </div>
   );
@@ -425,6 +245,7 @@ export default function AssetBrowser() {
 
   const filtered = useMemo(() => filterAssets(assets, filters), [assets, filters]);
 
+  // Reset page when filters change
   useEffect(() => {
     setPage(0);
   }, [debouncedSearch, category, format, sourceSet]);
@@ -450,9 +271,6 @@ export default function AssetBrowser() {
       ? Math.min(100, Math.round((loadProgress.loaded / loadProgress.total) * 100))
       : 0;
 
-  const modelCount = (stats.byFormat.glb ?? 0) + (stats.byFormat.gltf ?? 0) + (stats.byFormat.fbx ?? 0);
-  const animCount = stats.byCategory.animation ?? 0;
-
   return (
     <div>
       <TopBar title="Warlords Asset Catalog" />
@@ -472,14 +290,15 @@ export default function AssetBrowser() {
         <a href={ASSETS_CDN} target="_blank" rel="noreferrer" className="text-violet-300 hover:underline">
           {ASSETS_CDN}
         </a>
-        . <strong>3D models and animations preview live</strong> in the detail drawer. Topology map:{" "}
+        . Topology map:{" "}
         <Link href="/assets" className="text-primary hover:underline">
-          Assets & SSOT
+          Assets &amp; SSOT
         </Link>
         .
       </p>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard
           icon={<Package size={22} className="mx-auto text-primary" />}
           value={catalog.isLoading ? "…" : stats.total.toLocaleString()}
@@ -492,13 +311,8 @@ export default function AssetBrowser() {
         />
         <StatCard
           icon="🧊"
-          value={catalog.isLoading ? "…" : modelCount.toLocaleString()}
-          label="3D models"
-        />
-        <StatCard
-          icon="🎞"
-          value={catalog.isLoading ? "…" : animCount.toLocaleString()}
-          label="Animations"
+          value={catalog.isLoading ? "…" : (stats.byFormat.glb ?? 0) + (stats.byFormat.fbx ?? 0)}
+          label="3D models (glb+fbx)"
         />
         <StatCard
           icon="💾"
@@ -507,6 +321,7 @@ export default function AssetBrowser() {
         />
       </div>
 
+      {/* Load progress */}
       {loading && (
         <div className="inset-panel p-3 mb-4 flex items-center gap-3 text-xs">
           <Loader2 size={16} className="animate-spin text-primary" />
@@ -541,6 +356,7 @@ export default function AssetBrowser() {
         </div>
       )}
 
+      {/* Filters */}
       <div className="fantasy-panel p-4 mb-5 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Filter size={14} className="text-primary" />
@@ -619,6 +435,7 @@ export default function AssetBrowser() {
           </label>
         </div>
 
+        {/* Category chips */}
         <div className="flex flex-wrap gap-1.5 pt-1">
           <button
             type="button"
@@ -647,6 +464,7 @@ export default function AssetBrowser() {
         </div>
       </div>
 
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="text-xs text-muted-foreground">
           Showing{" "}
@@ -684,6 +502,7 @@ export default function AssetBrowser() {
         </div>
       </div>
 
+      {/* Grid / list */}
       {view === "grid" ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3 mb-6">
           {slice.map((a) => (
@@ -698,12 +517,91 @@ export default function AssetBrowser() {
               </div>
               <div className="p-2.5">
                 <p className="text-xs font-semibold truncate group-hover:text-primary">{a.name}</p>
-                <p className="text-[0.6rem] text-muted-foreground truncate">
-                  {a.category} · {formatBytes(a.fileSize)}
-                </p>
+                <p className="text-[0.6rem] text-muted-foreground truncate mt-0.5">{a.r2Key}</p>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[0.55rem] uppercase tracking-wide text-primary/80">
+                    {a.category}
+                  </span>
+                  <span className="text-[0.55rem] text-muted-foreground">{formatBytes(a.fileSize)}</span>
+                </div>
               </div>
             </button>
           ))}
         </div>
       ) : (
-        <div className=
+        <div className="inset-panel overflow-x-auto mb-6">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary">Name</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary">Category</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary">Format</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary">Source</th>
+                <th className="text-right px-3 py-2 text-[0.65rem] uppercase text-primary">Size</th>
+                <th className="text-left px-3 py-2 text-[0.65rem] uppercase text-primary">R2 key</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slice.map((a) => (
+                <tr
+                  key={a.id}
+                  className="border-b border-border/40 hover:bg-accent/30 cursor-pointer"
+                  onClick={() => setSelected(a)}
+                >
+                  <td className="px-3 py-2 font-medium">{a.name}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {categoryIcon(a.category)} {a.category}
+                  </td>
+                  <td className="px-3 py-2 text-xs uppercase font-mono">
+                    {a.format || extFromKey(a.r2Key) || "—"}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{a.sourceSet || "—"}</td>
+                  <td className="px-3 py-2 text-xs text-right font-mono">{formatBytes(a.fileSize)}</td>
+                  <td className="px-3 py-2 text-[0.65rem] font-mono text-muted-foreground max-w-[280px] truncate">
+                    {a.r2Key}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground text-sm">
+          No assets match these filters.
+          <button type="button" onClick={clearFilters} className="block mx-auto mt-3 text-primary hover:underline">
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {filtered.length > PAGE && (
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <button
+            type="button"
+            disabled={safePage <= 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="gilded-button px-3 py-1.5 text-xs disabled:opacity-40 flex items-center gap-1"
+          >
+            <ChevronLeft size={14} /> Prev
+          </button>
+          <span className="text-xs font-mono text-muted-foreground">
+            {safePage + 1} / {pageCount}
+          </span>
+          <button
+            type="button"
+            disabled={safePage >= pageCount - 1}
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            className="gilded-button px-3 py-1.5 text-xs disabled:opacity-40 flex items-center gap-1"
+          >
+            Next <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+
+      <DetailDrawer asset={selected} onClose={() => setSelected(null)} />
+    </div>
+  );
+}
