@@ -4,7 +4,7 @@ import {
   Server, HardDrive, Database, ScrollText, Rocket, Train,
   Trophy, Layers, Monitor, TableProperties, Search, Coins,
   Settings2, BookOpen, LogOut, Crosshair, Flame, Settings, Package, Boxes,
-  UserCircle2, Link2, Shield,
+  UserCircle2, Link2, Shield, Globe, Share2, MessageSquare,
 } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 import { useGrudgePanel } from "./GrudgePanel";
@@ -79,6 +79,42 @@ const NAV = [
       { href: "/storage", label: "Object Storage", icon: HardDrive },
       { href: "/logs", label: "Logs", icon: ScrollText },
       { href: "/docs", label: "Docs & Maps", icon: BookOpen },
+      { href: "/health", label: "Health Check", icon: Shield },
+    ],
+  },
+  {
+    section: "Community & Social",
+    items: [
+      { 
+        href: "https://www.spawn.co/@survival/grudge-links", 
+        label: "Grudge Social", 
+        icon: MessageSquare, 
+        external: true 
+      },
+      { 
+        href: "https://www.spawn.co/@survival/grudges", 
+        label: "Grudges World", 
+        icon: Globe, 
+        external: true 
+      },
+      { 
+        href: "https://www.spawn.co/@survival/nexus-nemesis-season-1", 
+        label: "Nexus Nemesis S1", 
+        icon: Share2, 
+        external: true 
+      },
+      { 
+        href: "https://www.spawn.co/@survival/grudge-warlords-open-water", 
+        label: "Warlords Open Water", 
+        icon: Swords, 
+        external: true 
+      },
+      { 
+        href: "https://www.spawn.co/@racalvin/grudge-warlords", 
+        label: "Racalvin Warlords", 
+        icon: Trophy, 
+        external: true 
+      },
     ],
   },
 ];

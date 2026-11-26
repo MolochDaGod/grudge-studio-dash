@@ -35,6 +35,7 @@ import Docs from "./pages/Docs";
 import Railway from "./pages/Railway";
 import Battle from "./pages/Battle";
 import Settings from "./pages/Settings";
+import Health from "./pages/Health";
 
 export default function App() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/" component={Overview} />
             {/* Canonical Grudge ID return path — AuthProvider picks up ?grudge_token= */}
             <Route path="/auth/callback" component={Overview} />
+            <Route path="/health" component={Health} />
             <Route path="/settings" component={Settings} />
             <Route path="/accounts" component={Accounts} />
             <Route path="/characters" component={Characters} />
